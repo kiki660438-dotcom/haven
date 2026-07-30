@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 import { createOrder } from "./actions";
 
 export default async function CheckoutPage({
@@ -7,6 +7,7 @@ export default async function CheckoutPage({
   searchParams: Promise<{ appointment?: string }>;
 }) {
   const { appointment: appointmentId } = await searchParams;
+  const supabase = await createClient();
 
   const [{ data: customers }, { data: services }] = await Promise.all([
     supabase.from("customers").select("*").order("name"),

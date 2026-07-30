@@ -1,10 +1,11 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function createOrder(formData: FormData) {
+  const supabase = await createClient();
   const appointment_id = (formData.get("appointment_id") as string) || null;
   const customer_id = (formData.get("customer_id") as string) || null;
   const customer_name = (formData.get("customer_name") as string) || null;
@@ -51,7 +52,13 @@ export async function createOrder(formData: FormData) {
   redirect("/orders?success=1");
 }
 
-export async function markOrderPaid(id: string) {
-  await supabase.from("orders").update({ status: "paid" }).eq("id", id);
+export async function markOrderPaid(id: string, payment_method: "cash" | "transfer") {
+  const supabase = await createClient();
+  await supabase
+    .from("orders")
+    .update({ status: "paid", payment_method })
+    .eq("id", id);
   revalidatePath("/orders");
+  revalidatePath("/revenue");
+  revalidatePath("/members");
 }

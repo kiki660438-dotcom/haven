@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "./actions";
 
 const statusLabel: Record<string, string> = {
@@ -10,6 +10,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function AppointmentsPage() {
+  const supabase = await createClient();
   const { data: appointments } = await supabase
     .from("appointments")
     .select("id, start_time, status, customers(name, phone), services(name, price)")

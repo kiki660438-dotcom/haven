@@ -1,7 +1,8 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 import { addCustomer, deleteCustomer } from "./actions";
 
 export default async function CustomersPage() {
+  const supabase = await createClient();
   const { data: customers } = await supabase
     .from("customers")
     .select("*")

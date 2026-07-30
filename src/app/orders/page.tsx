@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 import { markOrderPaid } from "../checkout/actions";
 
 export default async function OrdersPage({
@@ -7,10 +7,11 @@ export default async function OrdersPage({
   searchParams: Promise<{ success?: string }>;
 }) {
   const { success } = await searchParams;
+  const supabase = await createClient();
 
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, total, status, customer_name, created_at, customers(name), order_items(service_name, price, quantity)")
+    .select("id, total, status, payment_method, customer_name, created_at, customers(name), order_items(service_name, price, quantity)")
     .order("created_at", { ascending: false });
 
   return (
@@ -49,7 +50,9 @@ export default async function OrdersPage({
                       : "bg-yellow-100 text-yellow-700"
                   }`}
                 >
-                  {o.status === "paid" ? "已付款" : "未付款"}
+                  {o.status === "paid"
+                    ? `已付款・${o.payment_method === "cash" ? "現金" : "匯款"}`
+                    : "未付款"}
                 </span>
               </div>
               <ul className="text-sm text-foreground/70 mb-2">
@@ -62,11 +65,18 @@ export default async function OrdersPage({
               <div className="flex justify-between items-center">
                 <p className="font-bold">總計 ${o.total}</p>
                 {o.status !== "paid" && (
-                  <form action={markOrderPaid.bind(null, o.id)}>
-                    <button className="text-primary-dark text-sm underline">
-                      標記為已付款
-                    </button>
-                  </form>
+                  <div className="flex gap-3">
+                    <form action={markOrderPaid.bind(null, o.id, "cash")}>
+                      <button className="text-primary-dark text-sm underline">
+                        現金付款
+                      </button>
+                    </form>
+                    <form action={markOrderPaid.bind(null, o.id, "transfer")}>
+                      <button className="text-primary-dark text-sm underline">
+                        匯款付款
+                      </button>
+                    </form>
+                  </div>
                 )}
               </div>
             </div>

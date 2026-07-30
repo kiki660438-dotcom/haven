@@ -1,16 +1,19 @@
 import { supabase } from "@/lib/supabase";
-import { createBooking } from "./actions";
+import { createBooking, getAvailableSlots } from "./actions";
 
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string }>;
+  searchParams: Promise<{ success?: string; error?: string; service_id?: string; date?: string }>;
 }) {
-  const { success } = await searchParams;
+  const { success, error, service_id, date } = await searchParams;
   const { data: services } = await supabase
     .from("services")
     .select("*")
     .order("name");
+
+  const slots =
+    service_id && date ? await getAvailableSlots(service_id, date) : null;
 
   return (
     <main className="max-w-xl mx-auto p-8">
@@ -21,53 +24,101 @@ export default async function BookPage({
           預約已送出！我們會盡快與您確認 🎉
         </div>
       )}
+      {error === "conflict" && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          抱歉，這個時段剛剛被其他客人預約走了，請重新選擇時段。
+        </div>
+      )}
+      {error === "no_slot" && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          請選擇一個可預約時段。
+        </div>
+      )}
 
       <form
-        action={createBooking}
-        className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white"
+        method="GET"
+        action="/book"
+        className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white mb-6"
       >
-        <input
-          name="name"
-          placeholder="姓名 *"
-          required
-          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-        />
-        <input
-          name="phone"
-          placeholder="電話 *"
-          required
-          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-        />
         <select
           name="service_id"
           required
+          defaultValue={service_id ?? ""}
           className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
         >
           <option value="">選擇服務 *</option>
           {services?.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name}（${s.price}／{s.duration_minutes}分）
+              {s.name}（${s.price}）
             </option>
           ))}
         </select>
         <input
-          name="start_time"
-          type="datetime-local"
+          name="date"
+          type="date"
           required
+          defaultValue={date ?? ""}
           className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
         />
         <button
           type="submit"
           className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
         >
-          送出預約
+          查詢可預約時段
         </button>
       </form>
 
-      {services?.length === 0 && (
-        <p className="mt-4 text-sm text-foreground/50">
-          目前還沒有可選的服務項目，請先到「服務項目」頁面新增。
-        </p>
+      {slots && (
+        <form
+          action={createBooking}
+          className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white"
+        >
+          <input type="hidden" name="service_id" value={service_id} />
+          <input type="hidden" name="date" value={date} />
+
+          <input
+            name="name"
+            placeholder="姓名 *"
+            required
+            className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+          />
+          <input
+            name="phone"
+            placeholder="電話 *"
+            required
+            className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+          />
+
+          {slots.length > 0 ? (
+            <div>
+              <p className="text-sm text-foreground/60 mb-2">選擇可預約時段 *</p>
+              <div className="grid grid-cols-4 gap-2">
+                {slots.map((t) => (
+                  <label
+                    key={t}
+                    className="flex items-center justify-center gap-1 border border-primary-light rounded-lg px-2 py-2 text-sm cursor-pointer has-[:checked]:bg-primary-dark has-[:checked]:text-white"
+                  >
+                    <input type="radio" name="time" value={t} required className="hidden" />
+                    {t}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-foreground/50">
+              這天已經沒有空的時段了，請選擇其他日期。
+            </p>
+          )}
+
+          {slots.length > 0 && (
+            <button
+              type="submit"
+              className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
+            >
+              送出預約
+            </button>
+          )}
+        </form>
       )}
     </main>
   );

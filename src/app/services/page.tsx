@@ -1,7 +1,8 @@
-import { supabase } from "@/lib/supabase";
-import { addService, deleteService } from "./actions";
+import { createClient } from "@/lib/supabase-server";
+import { addService, deleteService, updateService } from "./actions";
 
 export default async function ServicesPage() {
+  const supabase = await createClient();
   const { data: services } = await supabase
     .from("services")
     .select("*")
@@ -47,8 +48,7 @@ export default async function ServicesPage() {
         <thead>
           <tr className="border-b border-primary-light bg-primary-light">
             <th className="py-2 px-3">名稱</th>
-            <th className="px-3">價格</th>
-            <th className="px-3">時長</th>
+            <th className="px-3">價格 / 時長（可直接調整）</th>
             <th></th>
           </tr>
         </thead>
@@ -56,8 +56,30 @@ export default async function ServicesPage() {
           {services?.map((s) => (
             <tr key={s.id} className="border-b border-primary-light/60">
               <td className="py-2 px-3">{s.name}</td>
-              <td className="px-3">${s.price}</td>
-              <td className="px-3">{s.duration_minutes} 分</td>
+              <td className="px-3">
+                <form
+                  action={updateService.bind(null, s.id)}
+                  className="flex items-center gap-2"
+                >
+                  <span>$</span>
+                  <input
+                    type="number"
+                    name="price"
+                    defaultValue={s.price}
+                    className="w-20 border border-primary-light rounded-lg px-2 py-1"
+                  />
+                  <input
+                    type="number"
+                    name="duration_minutes"
+                    defaultValue={s.duration_minutes}
+                    className="w-16 border border-primary-light rounded-lg px-2 py-1"
+                  />
+                  <span className="text-foreground/50">分</span>
+                  <button type="submit" className="text-primary-dark text-sm underline">
+                    更新
+                  </button>
+                </form>
+              </td>
               <td className="px-3">
                 <form action={deleteService.bind(null, s.id)}>
                   <button type="submit" className="text-red-500 text-sm">
@@ -69,7 +91,7 @@ export default async function ServicesPage() {
           ))}
           {services?.length === 0 && (
             <tr>
-              <td colSpan={4} className="py-6 px-3 text-center text-foreground/50">
+              <td colSpan={3} className="py-6 px-3 text-center text-foreground/50">
                 還沒有服務項目
               </td>
             </tr>
