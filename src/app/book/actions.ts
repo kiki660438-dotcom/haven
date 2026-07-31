@@ -3,7 +3,12 @@
 import { supabase } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { verifyLineIdentity } from "@/lib/line";
+import { cookies } from "next/headers";
+import {
+  CUSTOMER_COOKIE,
+  CUSTOMER_COOKIE_MAX_AGE,
+  signCustomerToken,
+} from "@/lib/customer-identity";
 
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 18;
@@ -68,20 +73,69 @@ export async function getAvailableSlots(serviceId: string, date: string) {
   return slots;
 }
 
+export async function verifyPhone(formData: FormData) {
+  const name = (formData.get("name") as string)?.trim();
+  const phone = (formData.get("phone") as string)?.trim();
+  const birthday = (formData.get("birthday") as string) || null;
+  const gender = (formData.get("gender") as string) || null;
+  const service_id = (formData.get("service_id") as string) || "";
+  const date = (formData.get("date") as string) || "";
+  const query = `service_id=${service_id}&date=${date}`;
+
+  if (!name || !phone) {
+    redirect(`/book?${query}&error=no_identity`);
+  }
+
+  const { data: existingId } = await supabase.rpc("find_customer_id_by_phone", {
+    p_phone: phone,
+  });
+
+  let customerId: string;
+  if (existingId) {
+    customerId = existingId;
+  } else {
+    const { error } = await supabase.from("customers").insert({ name, phone, birthday, gender });
+    if (error) throw new Error("建立客戶失敗");
+
+    const { data: newId } = await supabase.rpc("find_customer_id_by_phone", {
+      p_phone: phone,
+    });
+    if (!newId) throw new Error("建立客戶失敗");
+    customerId = newId;
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(CUSTOMER_COOKIE, signCustomerToken(customerId, name), {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    maxAge: CUSTOMER_COOKIE_MAX_AGE,
+    path: "/",
+  });
+
+  redirect(`/book?${query}`);
+}
+
+export async function logoutCustomer(formData: FormData) {
+  const service_id = (formData.get("service_id") as string) || "";
+  const date = (formData.get("date") as string) || "";
+  const cookieStore = await cookies();
+  cookieStore.delete(CUSTOMER_COOKIE);
+  redirect(`/book?service_id=${service_id}&date=${date}`);
+}
+
 export async function createBooking(formData: FormData) {
-  const name = formData.get("name") as string;
-  const phone = (formData.get("phone") as string) || null;
-  const lineToken = (formData.get("line_token") as string) || null;
+  const customer_id = formData.get("customer_id") as string;
   const service_id = formData.get("service_id") as string;
   const date = formData.get("date") as string;
   const time = formData.get("time") as string;
 
-  if (!time) {
-    redirect(`/book?service_id=${service_id}&date=${date}&error=no_slot`);
+  if (!customer_id) {
+    redirect(`/book?service_id=${service_id}&date=${date}&error=no_identity`);
   }
 
-  if (!phone && !lineToken) {
-    redirect(`/book?service_id=${service_id}&date=${date}&error=no_identity`);
+  if (!time) {
+    redirect(`/book?service_id=${service_id}&date=${date}&error=no_slot`);
   }
 
   const start_time = `${date}T${time}:00+08:00`;
@@ -99,55 +153,8 @@ export async function createBooking(formData: FormData) {
     redirect(`/book?service_id=${service_id}&date=${date}&error=conflict`);
   }
 
-  let customerId: string;
-
-  if (lineToken) {
-    const identity = verifyLineIdentity(lineToken);
-    if (!identity) {
-      redirect(`/book?service_id=${service_id}&date=${date}&error=line_login`);
-    }
-
-    const { data: existingId } = await supabase.rpc("find_customer_id_by_line_user_id", {
-      p_line_user_id: identity.userId,
-    });
-
-    if (existingId) {
-      customerId = existingId;
-    } else {
-      const { error } = await supabase.from("customers").insert({
-        name: name || identity.displayName,
-        phone,
-        line_user_id: identity.userId,
-      });
-      if (error) throw new Error("建立客戶失敗");
-
-      const { data: newId } = await supabase.rpc("find_customer_id_by_line_user_id", {
-        p_line_user_id: identity.userId,
-      });
-      if (!newId) throw new Error("建立客戶失敗");
-      customerId = newId;
-    }
-  } else {
-    const { data: existingId } = await supabase.rpc("find_customer_id_by_phone", {
-      p_phone: phone,
-    });
-
-    if (existingId) {
-      customerId = existingId;
-    } else {
-      const { error } = await supabase.from("customers").insert({ name, phone });
-      if (error) throw new Error("建立客戶失敗");
-
-      const { data: newId } = await supabase.rpc("find_customer_id_by_phone", {
-        p_phone: phone,
-      });
-      if (!newId) throw new Error("建立客戶失敗");
-      customerId = newId;
-    }
-  }
-
   await supabase.from("appointments").insert({
-    customer_id: customerId,
+    customer_id,
     service_id,
     start_time,
     status: "pending",

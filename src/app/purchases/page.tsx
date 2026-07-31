@@ -65,7 +65,8 @@ export default async function PurchasesPage() {
       </form>
 
       <h2 className="font-semibold mb-2">目前庫存</h2>
-      <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden mb-8">
+      <div className="overflow-x-auto mb-8">
+      <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden">
         <thead>
           <tr className="border-b border-primary-light bg-primary-light">
             <th className="py-2 px-3">商品</th>
@@ -92,8 +93,10 @@ export default async function PurchasesPage() {
           )}
         </tbody>
       </table>
+      </div>
 
       <h2 className="font-semibold mb-2">進貨歷史</h2>
+      <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden">
         <thead>
           <tr className="border-b border-primary-light bg-primary-light">
@@ -132,6 +135,7 @@ export default async function PurchasesPage() {
           )}
         </tbody>
       </table>
+      </div>
     </main>
   );
 }

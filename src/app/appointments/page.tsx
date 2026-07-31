@@ -20,6 +20,7 @@ export default async function AppointmentsPage() {
     <main className="max-w-4xl mx-auto p-8">
       <h1 className="text-2xl font-bold text-primary-dark mb-6">預約管理</h1>
 
+      <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden">
         <thead>
           <tr className="border-b border-primary-light bg-primary-light">
@@ -78,6 +79,7 @@ export default async function AppointmentsPage() {
           )}
         </tbody>
       </table>
+      </div>
     </main>
   );
 }

@@ -9,13 +9,16 @@ export async function createOrder(formData: FormData) {
   const appointment_id = (formData.get("appointment_id") as string) || null;
   const customer_id = (formData.get("customer_id") as string) || null;
   const customer_name = (formData.get("customer_name") as string) || null;
+  const staff_id = (formData.get("staff_id") as string) || null;
 
   const { data: services } = await supabase.from("services").select("*");
+
+  const MAX_QTY = 20;
 
   const items =
     services
       ?.map((s) => {
-        const qty = Number(formData.get(`qty_${s.id}`)) || 0;
+        const qty = Math.min(Number(formData.get(`qty_${s.id}`)) || 0, MAX_QTY);
         return qty > 0
           ? { service_id: s.id, service_name: s.name, price: s.price, quantity: qty }
           : null;
@@ -30,7 +33,7 @@ export async function createOrder(formData: FormData) {
 
   const { data: order, error } = await supabase
     .from("orders")
-    .insert({ appointment_id, customer_id, customer_name, total })
+    .insert({ appointment_id, customer_id, customer_name, staff_id, total })
     .select("id")
     .single();
 
@@ -39,6 +42,32 @@ export async function createOrder(formData: FormData) {
   await supabase
     .from("order_items")
     .insert(items.map((i) => ({ ...i, order_id: order.id })));
+
+  // 購買商品券方案（有堂數的服務項目）時，自動建立商品券
+  const packageItems = items.filter((i) =>
+    services?.some((s) => s.id === i.service_id && s.total_sessions)
+  );
+  if (packageItems.length > 0 && customer_id) {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+    const newVouchers = packageItems.flatMap((i) => {
+      const service = services!.find((s) => s.id === i.service_id)!;
+      return Array.from({ length: i.quantity }, () => ({
+        code: Math.random().toString(36).slice(2, 10).toUpperCase(),
+        customer_id,
+        service_name: service.name,
+        initial_value: service.price,
+        remaining_value: service.price,
+        total_sessions: service.total_sessions,
+        remaining_sessions: service.total_sessions,
+        status: "active",
+        purchased_at: today,
+        issued_at: `${today}T12:00:00+08:00`,
+      }));
+    });
+    const { error: voucherError } = await supabase.from("vouchers").insert(newVouchers);
+    if (voucherError) throw new Error("建立商品券失敗：" + voucherError.message);
+    revalidatePath("/vouchers");
+  }
 
   if (appointment_id) {
     await supabase

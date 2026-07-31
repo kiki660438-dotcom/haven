@@ -1,6 +1,7 @@
+import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
-import { verifyLineIdentity } from "@/lib/line";
-import { createBooking, getAvailableSlots } from "./actions";
+import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
+import { createBooking, getAvailableSlots, verifyPhone, logoutCustomer } from "./actions";
 
 export default async function BookPage({
   searchParams,
@@ -10,10 +11,9 @@ export default async function BookPage({
     error?: string;
     service_id?: string;
     date?: string;
-    line_token?: string;
   }>;
 }) {
-  const { success, error, service_id, date, line_token } = await searchParams;
+  const { success, error, service_id, date } = await searchParams;
   const { data: services } = await supabase
     .from("services")
     .select("*")
@@ -22,7 +22,8 @@ export default async function BookPage({
   const slots =
     service_id && date ? await getAvailableSlots(service_id, date) : null;
 
-  const lineIdentity = line_token ? verifyLineIdentity(line_token) : null;
+  const cookieStore = await cookies();
+  const identity = verifyCustomerToken(cookieStore.get(CUSTOMER_COOKIE)?.value);
 
   const returnTo = `/book?service_id=${service_id ?? ""}&date=${date ?? ""}`;
   const lineLoginUrl = `/api/line/login?returnTo=${encodeURIComponent(returnTo)}`;
@@ -48,7 +49,7 @@ export default async function BookPage({
       )}
       {error === "no_identity" && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
-          請填寫電話，或使用 LINE 帳號驗證身份。
+          請填寫姓名與電話，或使用 LINE 帳號驗證身份。
         </div>
       )}
       {error === "line_login" && (
@@ -62,7 +63,6 @@ export default async function BookPage({
         action="/book"
         className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white mb-6"
       >
-        {line_token && <input type="hidden" name="line_token" value={line_token} />}
         <select
           name="service_id"
           required
@@ -91,41 +91,88 @@ export default async function BookPage({
         </button>
       </form>
 
-      {slots && (
+      {slots && !identity && (
+        <div className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white">
+          <p className="text-sm text-foreground/60">
+            第一次預約請先驗證身份，之後系統會記住您，不用再輸入姓名電話。
+          </p>
+
+          <form action={verifyPhone} className="flex flex-col gap-3">
+            <input type="hidden" name="service_id" value={service_id} />
+            <input type="hidden" name="date" value={date} />
+            <input
+              name="name"
+              placeholder="姓名 *"
+              required
+              className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+            />
+            <input
+              name="phone"
+              placeholder="電話 *"
+              required
+              className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+            />
+            <div className="flex gap-3">
+              <label className="flex-1 flex flex-col gap-1 text-sm text-foreground/60">
+                生日年月日（選填）
+                <input
+                  name="birthday"
+                  type="date"
+                  className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+                />
+              </label>
+              <label className="flex-1 flex flex-col gap-1 text-sm text-foreground/60">
+                性別（選填）
+                <select
+                  name="gender"
+                  defaultValue=""
+                  className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+                >
+                  <option value=""></option>
+                  <option value="male">男</option>
+                  <option value="female">女</option>
+                  <option value="other">不透露</option>
+                </select>
+              </label>
+            </div>
+            <button
+              type="submit"
+              className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
+            >
+              電話登入
+            </button>
+          </form>
+
+          <a
+            href={lineLoginUrl}
+            className="text-center text-sm underline text-primary-dark"
+          >
+            沒有台灣手機號碼？點此使用 LINE 帳號登入
+          </a>
+        </div>
+      )}
+
+      {slots && identity && (
+        <div className="flex items-center justify-between p-3 mb-4 rounded-lg bg-primary-light text-primary-dark text-sm">
+          <span>哈囉，{identity.name}！</span>
+          <form action={logoutCustomer}>
+            <input type="hidden" name="service_id" value={service_id} />
+            <input type="hidden" name="date" value={date} />
+            <button type="submit" className="underline">
+              不是您本人？登出
+            </button>
+          </form>
+        </div>
+      )}
+
+      {slots && identity && (
         <form
           action={createBooking}
           className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white"
         >
           <input type="hidden" name="service_id" value={service_id} />
           <input type="hidden" name="date" value={date} />
-
-          {lineIdentity ? (
-            <div className="p-3 rounded-lg bg-primary-light text-primary-dark text-sm">
-              已使用 LINE 帳號驗證：{lineIdentity.displayName}
-              <input type="hidden" name="line_token" value={line_token} />
-            </div>
-          ) : (
-            <a
-              href={lineLoginUrl}
-              className="text-center text-sm underline text-primary-dark"
-            >
-              沒有台灣手機號碼？點此使用 LINE 帳號驗證身份預約
-            </a>
-          )}
-
-          <input
-            name="name"
-            placeholder="姓名 *"
-            required
-            defaultValue={lineIdentity?.displayName ?? ""}
-            className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-          />
-          <input
-            name="phone"
-            placeholder={lineIdentity ? "電話（已用 LINE 驗證，可不填）" : "電話 *"}
-            required={!lineIdentity}
-            className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-          />
+          <input type="hidden" name="customer_id" value={identity.customerId} />
 
           {slots.length > 0 ? (
             <div>

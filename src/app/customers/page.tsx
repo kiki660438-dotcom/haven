@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase-server";
-import { addCustomer, deleteCustomer } from "./actions";
+import { addCustomer, deleteCustomer, updateCustomerDemographics } from "./actions";
 
 export default async function CustomersPage() {
   const supabase = await createClient();
@@ -33,6 +33,21 @@ export default async function CustomersPage() {
           className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
         />
         <input
+          name="birthday"
+          type="date"
+          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+        />
+        <select
+          name="gender"
+          defaultValue=""
+          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+        >
+          <option value="">性別（選填）</option>
+          <option value="male">男</option>
+          <option value="female">女</option>
+          <option value="other">不透露</option>
+        </select>
+        <input
           name="note"
           placeholder="備註"
           className="border border-primary-light rounded-lg px-3 py-2 col-span-2 focus:outline-none focus:border-primary"
@@ -45,6 +60,7 @@ export default async function CustomersPage() {
         </button>
       </form>
 
+      <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden">
         <thead>
           <tr className="border-b border-primary-light bg-primary-light">
@@ -52,6 +68,7 @@ export default async function CustomersPage() {
             <th className="px-3">電話</th>
             <th className="px-3">Email</th>
             <th className="px-3">備註</th>
+            <th className="px-3">生日 / 性別</th>
             <th></th>
           </tr>
         </thead>
@@ -63,6 +80,32 @@ export default async function CustomersPage() {
               <td className="px-3">{c.email}</td>
               <td className="px-3">{c.note}</td>
               <td className="px-3">
+                <form
+                  action={updateCustomerDemographics.bind(null, c.id)}
+                  className="flex items-center gap-1"
+                >
+                  <input
+                    name="birthday"
+                    type="date"
+                    defaultValue={c.birthday ?? ""}
+                    className="border border-primary-light rounded-lg px-2 py-1 text-sm w-36 focus:outline-none focus:border-primary"
+                  />
+                  <select
+                    name="gender"
+                    defaultValue={c.gender ?? ""}
+                    className="border border-primary-light rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-primary"
+                  >
+                    <option value="">-</option>
+                    <option value="male">男</option>
+                    <option value="female">女</option>
+                    <option value="other">不透露</option>
+                  </select>
+                  <button type="submit" className="text-primary-dark text-sm underline">
+                    儲存
+                  </button>
+                </form>
+              </td>
+              <td className="px-3">
                 <form action={deleteCustomer.bind(null, c.id)}>
                   <button type="submit" className="text-red-500 text-sm">
                     刪除
@@ -73,13 +116,14 @@ export default async function CustomersPage() {
           ))}
           {customers?.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-6 px-3 text-center text-foreground/50">
+              <td colSpan={6} className="py-6 px-3 text-center text-foreground/50">
                 還沒有客戶資料
               </td>
             </tr>
           )}
         </tbody>
       </table>
+      </div>
     </main>
   );
 }

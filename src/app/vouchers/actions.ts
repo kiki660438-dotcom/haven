@@ -3,50 +3,34 @@
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 
-function randomCode() {
-  return Math.random().toString(36).slice(2, 10).toUpperCase();
-}
-
-export async function issueVoucher(formData: FormData) {
+export async function useSession(id: string) {
   const supabase = await createClient();
-  const customer_id = (formData.get("customer_id") as string) || null;
-  const initial_value = Number(formData.get("initial_value"));
-  const expires_at = (formData.get("expires_at") as string) || null;
-
-  await supabase.from("vouchers").insert({
-    code: randomCode(),
-    customer_id,
-    initial_value,
-    remaining_value: initial_value,
-    expires_at,
-  });
-
-  revalidatePath("/vouchers");
-}
-
-export async function redeemVoucher(id: string, formData: FormData) {
-  const supabase = await createClient();
-  const amount = Number(formData.get("amount"));
 
   const { data: voucher } = await supabase
     .from("vouchers")
-    .select("remaining_value")
+    .select("remaining_sessions, remaining_value, initial_value, total_sessions")
     .eq("id", id)
     .single();
 
-  if (!voucher || amount <= 0 || amount > voucher.remaining_value) {
-    throw new Error("使用金額不合法");
+  if (!voucher || !voucher.remaining_sessions || voucher.remaining_sessions <= 0) {
+    throw new Error("已經沒有剩餘堂數");
   }
 
-  const remaining = voucher.remaining_value - amount;
+  const remaining_sessions = voucher.remaining_sessions - 1;
+  const perSession = voucher.total_sessions
+    ? voucher.initial_value / voucher.total_sessions
+    : 0;
+  const remaining_value = Math.max(0, Math.round(voucher.remaining_value - perSession));
 
   await supabase
     .from("vouchers")
     .update({
-      remaining_value: remaining,
-      status: remaining === 0 ? "used" : "active",
+      remaining_sessions,
+      remaining_value,
+      status: remaining_sessions === 0 ? "used" : "active",
     })
     .eq("id", id);
 
   revalidatePath("/vouchers");
+  revalidatePath("/checkout");
 }

@@ -9,9 +9,12 @@ const cards = [
   { href: "/appointments", title: "預約管理", desc: "查看與確認所有預約" },
   { href: "/checkout", title: "開單結帳", desc: "到店開單、選服務、結帳" },
   { href: "/orders", title: "訂單紀錄", desc: "查看歷史消費紀錄" },
-  { href: "/vouchers", title: "商品卷", desc: "發行與使用儲值/贈品券" },
+  { href: "/vouchers", title: "商品券", desc: "查詢客戶的商品券堂數與狀態" },
   { href: "/purchases", title: "進貨紀錄", desc: "記錄商品進貨與庫存" },
+  { href: "/expenses", title: "固定支出", desc: "房租、水電、稅金等固定支出紀錄" },
   { href: "/revenue", title: "營業額總覽", desc: "營業額統計與服務項目排行" },
+  { href: "/staff", title: "員工資料", desc: "管理員工名單與抽成%數" },
+  { href: "/payroll", title: "業績薪資", desc: "依業績試算每位員工的抽成薪資" },
 ];
 
 export default function Home() {

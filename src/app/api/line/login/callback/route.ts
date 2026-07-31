@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { signLineIdentity } from "@/lib/line";
+import { supabase } from "@/lib/supabase";
+import {
+  CUSTOMER_COOKIE,
+  CUSTOMER_COOKIE_MAX_AGE,
+  signCustomerToken,
+} from "@/lib/customer-identity";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -51,12 +56,41 @@ export async function GET(request: Request) {
   }
 
   const { userId, displayName } = await profileRes.json();
-  const lineToken = signLineIdentity(userId, displayName);
+
+  const { data: existingId } = await supabase.rpc("find_customer_id_by_line_user_id", {
+    p_line_user_id: userId,
+  });
+
+  let customerId: string;
+  if (existingId) {
+    customerId = existingId;
+  } else {
+    const { error } = await supabase.from("customers").insert({
+      name: displayName,
+      line_user_id: userId,
+    });
+    if (error) {
+      return NextResponse.redirect(`${origin}${decodeURIComponent(returnTo)}?error=line_login`);
+    }
+    const { data: newId } = await supabase.rpc("find_customer_id_by_line_user_id", {
+      p_line_user_id: userId,
+    });
+    if (!newId) {
+      return NextResponse.redirect(`${origin}${decodeURIComponent(returnTo)}?error=line_login`);
+    }
+    customerId = newId;
+  }
 
   const redirectUrl = new URL(`${origin}${decodeURIComponent(returnTo)}`);
-  redirectUrl.searchParams.set("line_token", lineToken);
 
   const response = NextResponse.redirect(redirectUrl.toString());
+  response.cookies.set(CUSTOMER_COOKIE, signCustomerToken(customerId, displayName), {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    maxAge: CUSTOMER_COOKIE_MAX_AGE,
+    path: "/",
+  });
   response.cookies.delete("line_login_state");
   response.cookies.delete("line_login_return_to");
   return response;

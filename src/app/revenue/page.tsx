@@ -120,7 +120,8 @@ export default async function RevenuePage() {
       </div>
 
       <h2 className="font-semibold mb-3">日營業額（近 14 天）</h2>
-      <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden mb-8">
+      <div className="overflow-x-auto mb-8">
+      <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden">
         <thead>
           <tr className="border-b border-primary-light bg-primary-light">
             <th className="py-2 px-3">日期</th>
@@ -147,6 +148,7 @@ export default async function RevenuePage() {
           )}
         </tbody>
       </table>
+      </div>
 
       <h2 className="font-semibold mb-3">服務項目營業額排行</h2>
       <div className="flex flex-col gap-2">
