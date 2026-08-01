@@ -30,7 +30,12 @@ export default async function BookPage({
 
   return (
     <main className="max-w-xl mx-auto p-8">
-      <h1 className="text-2xl font-bold text-primary-dark mb-6">線上預約</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-primary-dark">線上預約</h1>
+        <a href="/my" className="text-sm underline text-primary-dark">
+          查看我的預約／商品券
+        </a>
+      </div>
 
       {success && (
         <div className="mb-6 p-4 rounded-xl bg-primary-light text-primary-dark">

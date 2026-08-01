@@ -80,10 +80,10 @@ export async function verifyPhone(formData: FormData) {
   const gender = (formData.get("gender") as string) || null;
   const service_id = (formData.get("service_id") as string) || "";
   const date = (formData.get("date") as string) || "";
-  const query = `service_id=${service_id}&date=${date}`;
+  const returnTo = (formData.get("return_to") as string) || `/book?service_id=${service_id}&date=${date}`;
 
   if (!name || !phone) {
-    redirect(`/book?${query}&error=no_identity`);
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=no_identity`);
   }
 
   const { data: existingId } = await supabase.rpc("find_customer_id_by_phone", {
@@ -113,15 +113,16 @@ export async function verifyPhone(formData: FormData) {
     path: "/",
   });
 
-  redirect(`/book?${query}`);
+  redirect(returnTo);
 }
 
 export async function logoutCustomer(formData: FormData) {
   const service_id = (formData.get("service_id") as string) || "";
   const date = (formData.get("date") as string) || "";
+  const returnTo = (formData.get("return_to") as string) || `/book?service_id=${service_id}&date=${date}`;
   const cookieStore = await cookies();
   cookieStore.delete(CUSTOMER_COOKIE);
-  redirect(`/book?service_id=${service_id}&date=${date}`);
+  redirect(returnTo);
 }
 
 export async function createBooking(formData: FormData) {
