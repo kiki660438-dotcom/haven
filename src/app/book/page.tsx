@@ -11,21 +11,22 @@ export default async function BookPage({
     error?: string;
     service_id?: string;
     date?: string;
+    staff_id?: string;
   }>;
 }) {
-  const { success, error, service_id, date } = await searchParams;
-  const { data: services } = await supabase
-    .from("services")
-    .select("*")
-    .order("name");
+  const { success, error, service_id, date, staff_id } = await searchParams;
+  const [{ data: services }, { data: staffList }] = await Promise.all([
+    supabase.from("services").select("*").order("name"),
+    supabase.from("staff").select("id, name").eq("active", true).order("name"),
+  ]);
 
   const slots =
-    service_id && date ? await getAvailableSlots(service_id, date) : null;
+    service_id && date ? await getAvailableSlots(service_id, date, staff_id) : null;
 
   const cookieStore = await cookies();
   const identity = verifyCustomerToken(cookieStore.get(CUSTOMER_COOKIE)?.value);
 
-  const returnTo = `/book?service_id=${service_id ?? ""}&date=${date ?? ""}`;
+  const returnTo = `/book?service_id=${service_id ?? ""}&date=${date ?? ""}&staff_id=${staff_id ?? ""}`;
   const lineLoginUrl = `/api/line/login?returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
@@ -88,6 +89,18 @@ export default async function BookPage({
           defaultValue={date ?? ""}
           className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
         />
+        <select
+          name="staff_id"
+          defaultValue={staff_id ?? ""}
+          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+        >
+          <option value="">指定設計師（選填，不指定則自動安排）</option>
+          {staffList?.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
@@ -105,6 +118,7 @@ export default async function BookPage({
           <form action={verifyPhone} className="flex flex-col gap-3">
             <input type="hidden" name="service_id" value={service_id} />
             <input type="hidden" name="date" value={date} />
+            <input type="hidden" name="return_to" value={returnTo} />
             <input
               name="name"
               placeholder="姓名 *"
@@ -163,6 +177,7 @@ export default async function BookPage({
           <form action={logoutCustomer}>
             <input type="hidden" name="service_id" value={service_id} />
             <input type="hidden" name="date" value={date} />
+            <input type="hidden" name="return_to" value={returnTo} />
             <button type="submit" className="underline">
               不是您本人？登出
             </button>
@@ -177,6 +192,7 @@ export default async function BookPage({
         >
           <input type="hidden" name="service_id" value={service_id} />
           <input type="hidden" name="date" value={date} />
+          <input type="hidden" name="staff_id" value={staff_id ?? ""} />
           <input type="hidden" name="customer_id" value={identity.customerId} />
 
           {slots.length > 0 ? (
