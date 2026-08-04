@@ -15,10 +15,13 @@ export default async function BookPage({
   }>;
 }) {
   const { success, error, service_id, date, staff_id } = await searchParams;
-  const [{ data: services }, { data: staffList }] = await Promise.all([
+  const [{ data: allServices }, { data: staffList }] = await Promise.all([
     supabase.from("services").select("*").order("name"),
     supabase.from("staff").select("id, name").eq("active", true).order("name"),
   ]);
+
+  // 商品券方案（有堂數的服務）只在店內結帳銷售，線上預約只讓客人選單次服務，避免選單太長太亂
+  const services = allServices?.filter((s) => !s.total_sessions);
 
   const slots =
     service_id && date ? await getAvailableSlots(service_id, date, staff_id) : null;
