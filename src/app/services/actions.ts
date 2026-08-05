@@ -23,8 +23,9 @@ export async function updateService(id: string, formData: FormData) {
   const supabase = await createClient();
   const price = Number(formData.get("price"));
   const duration_minutes = Number(formData.get("duration_minutes"));
+  const hide_from_booking = formData.get("hide_from_booking") === "on";
 
-  await supabase.from("services").update({ price, duration_minutes }).eq("id", id);
+  await supabase.from("services").update({ price, duration_minutes, hide_from_booking }).eq("id", id);
   revalidatePath("/services");
   revalidatePath("/book");
 }

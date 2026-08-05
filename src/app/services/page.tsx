@@ -76,6 +76,14 @@ export default async function ServicesPage() {
                     className="w-16 border border-primary-light rounded-lg px-2 py-1"
                   />
                   <span className="text-foreground/50">分</span>
+                  <label className="flex items-center gap-1 text-sm whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      name="hide_from_booking"
+                      defaultChecked={s.hide_from_booking}
+                    />
+                    不開放線上預約
+                  </label>
                   <button type="submit" className="text-primary-dark text-sm underline">
                     更新
                   </button>

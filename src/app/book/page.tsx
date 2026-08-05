@@ -20,8 +20,8 @@ export default async function BookPage({
     supabase.from("staff").select("id, name").eq("active", true).order("name"),
   ]);
 
-  // 商品券方案（有堂數的服務）只在店內結帳銷售，線上預約只讓客人選單次服務，避免選單太長太亂
-  const services = allServices?.filter((s) => !s.total_sessions);
+  // 商品券方案（有堂數的服務）只在店內結帳銷售，加上被標記「不開放線上預約」的項目，線上預約選單都不顯示
+  const services = allServices?.filter((s) => !s.total_sessions && !s.hide_from_booking);
 
   const slots =
     service_id && date ? await getAvailableSlots(service_id, date, staff_id) : null;
