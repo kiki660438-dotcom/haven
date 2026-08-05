@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
-import { updateAppointmentStatus } from "./actions";
+import { updateAppointmentStatus, updateAppointmentTime } from "./actions";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -8,6 +8,19 @@ const statusLabel: Record<string, string> = {
   cancelled: "已取消",
   completed: "已完成",
 };
+
+function toDateInputValue(iso: string) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date(iso));
+}
+
+function toTimeInputValue(iso: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Taipei",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
 
 export default async function AppointmentsPage() {
   const supabase = await createClient();
@@ -40,6 +53,26 @@ export default async function AppointmentsPage() {
                   <p className="text-xs text-foreground/50">
                     {new Date(a.start_time).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
                   </p>
+                  <form
+                    action={updateAppointmentTime.bind(null, a.id)}
+                    className="flex items-center gap-2 mt-2"
+                  >
+                    <input
+                      type="date"
+                      name="date"
+                      defaultValue={toDateInputValue(a.start_time)}
+                      className="border border-primary-light rounded-lg px-2 py-1 text-sm"
+                    />
+                    <input
+                      type="time"
+                      name="time"
+                      defaultValue={toTimeInputValue(a.start_time)}
+                      className="border border-primary-light rounded-lg px-2 py-1 text-sm"
+                    />
+                    <button type="submit" className="text-primary-dark text-sm underline whitespace-nowrap">
+                      更新時間
+                    </button>
+                  </form>
                 </div>
                 <span
                   className={`text-sm px-2 py-1 rounded-full whitespace-nowrap ${

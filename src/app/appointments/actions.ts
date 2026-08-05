@@ -35,3 +35,15 @@ export async function updateAppointmentStatus(id: string, status: string) {
     }
   }
 }
+
+export async function updateAppointmentTime(id: string, formData: FormData) {
+  const supabase = await createClient();
+  const date = formData.get("date") as string;
+  const time = formData.get("time") as string;
+  if (!date || !time) return;
+
+  const start_time = `${date}T${time}:00+08:00`;
+  await supabase.from("appointments").update({ start_time }).eq("id", id);
+  revalidatePath("/appointments");
+  revalidatePath("/dashboard");
+}

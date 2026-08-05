@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { logout } from "../login/actions";
+
+const PUBLIC_PREFIXES = ["/book", "/my", "/login"];
 
 const links = [
   { href: "/", label: "首頁" },
@@ -24,6 +27,18 @@ const links = [
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  if (isPublic) {
+    return (
+      <header className="bg-white border-b border-primary-light">
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <span className="font-bold text-primary-dark">Haven 美髮管理</span>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="bg-white border-b border-primary-light">
