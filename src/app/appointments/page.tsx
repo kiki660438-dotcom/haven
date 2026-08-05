@@ -26,7 +26,7 @@ export default async function AppointmentsPage() {
   const supabase = await createClient();
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, start_time, status, customers(name, phone), services(name, price)")
+    .select("id, start_time, status, buffer_minutes, customers(name, phone), services(name, price, buffer_minutes)")
     .order("start_time", { ascending: true });
 
   return (
@@ -69,8 +69,16 @@ export default async function AppointmentsPage() {
                       defaultValue={toTimeInputValue(a.start_time)}
                       className="border border-primary-light rounded-lg px-2 py-1 text-sm"
                     />
+                    <span className="text-xs text-foreground/50 whitespace-nowrap">緩衝</span>
+                    <input
+                      type="number"
+                      name="buffer_minutes"
+                      defaultValue={a.buffer_minutes ?? service?.buffer_minutes ?? 0}
+                      className="w-14 border border-primary-light rounded-lg px-2 py-1 text-sm"
+                    />
+                    <span className="text-xs text-foreground/50">分</span>
                     <button type="submit" className="text-primary-dark text-sm underline whitespace-nowrap">
-                      更新時間
+                      更新
                     </button>
                   </form>
                 </div>

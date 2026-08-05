@@ -76,14 +76,6 @@ export default async function ServicesPage() {
                     className="w-16 border border-primary-light rounded-lg px-2 py-1"
                   />
                   <span className="text-foreground/50">分</span>
-                  <span className="text-foreground/50">+緩衝</span>
-                  <input
-                    type="number"
-                    name="buffer_minutes"
-                    defaultValue={s.buffer_minutes ?? 0}
-                    className="w-16 border border-primary-light rounded-lg px-2 py-1"
-                  />
-                  <span className="text-foreground/50">分</span>
                   <label className="flex items-center gap-1 text-sm whitespace-nowrap">
                     <input
                       type="checkbox"

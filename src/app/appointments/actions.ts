@@ -40,10 +40,11 @@ export async function updateAppointmentTime(id: string, formData: FormData) {
   const supabase = await createClient();
   const date = formData.get("date") as string;
   const time = formData.get("time") as string;
+  const buffer_minutes = Number(formData.get("buffer_minutes")) || 0;
   if (!date || !time) return;
 
   const start_time = `${date}T${time}:00+08:00`;
-  await supabase.from("appointments").update({ start_time }).eq("id", id);
+  await supabase.from("appointments").update({ start_time, buffer_minutes }).eq("id", id);
   revalidatePath("/appointments");
   revalidatePath("/dashboard");
 }

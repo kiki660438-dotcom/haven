@@ -26,7 +26,7 @@ export async function getBusyIntervals(
 
   let query = supabase
     .from("appointments")
-    .select("id, start_time, status, staff_id, services(duration_minutes, buffer_minutes)")
+    .select("id, start_time, status, staff_id, buffer_minutes, services(duration_minutes, buffer_minutes)")
     .neq("status", "cancelled")
     .gte("start_time", dayStart)
     .lte("start_time", dayEnd);
@@ -43,7 +43,8 @@ export async function getBusyIntervals(
       const service = Array.isArray(a.services) ? a.services[0] : a.services;
       const start = new Date(a.start_time).getTime();
       const duration = service?.duration_minutes ?? 60;
-      const buffer = service?.buffer_minutes ?? 0;
+      // 每筆預約可以自己覆寫緩衝時間（在「預約管理」設定），沒設過就用服務項目的預設值
+      const buffer = a.buffer_minutes ?? service?.buffer_minutes ?? 0;
       return { start, end: start + (duration + buffer) * 60_000 };
     });
 }
@@ -218,6 +219,7 @@ export async function createBooking(formData: FormData) {
     start_time,
     status: "pending",
     staff_id: staffId,
+    buffer_minutes: service?.buffer_minutes ?? 0,
   });
 
   revalidatePath("/book");
