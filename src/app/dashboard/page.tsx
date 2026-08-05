@@ -83,65 +83,63 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse bg-white rounded-xl overflow-hidden">
-        <thead>
-          <tr className="border-b border-primary-light bg-primary-light">
-            <th className="py-2 px-3">時間</th>
-            <th className="px-3">客戶</th>
-            <th className="px-3">服務</th>
-            <th className="px-3">狀態</th>
-            <th className="px-3"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {todayAppointmentList?.map((a) => {
-            const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
-            const service = Array.isArray(a.services) ? a.services[0] : a.services;
-            return (
-              <tr key={a.id} className="border-b border-primary-light/60">
-                <td className="py-2 px-3">
-                  {new Date(a.start_time).toLocaleTimeString("zh-TW", {
-                    timeZone: "Asia/Taipei",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </td>
-                <td className="px-3">
-                  {customer?.name}
-                  <br />
-                  <span className="text-xs text-foreground/50">{customer?.phone}</span>
-                </td>
-                <td className="px-3">{service?.name}</td>
-                <td className="px-3">{statusLabel[a.status] ?? a.status}</td>
-                <td className="px-3">
-                  <div className="flex flex-wrap gap-2">
-                    <form action={updateAppointmentStatus.bind(null, a.id, "confirmed")}>
-                      <button className="text-primary-dark text-sm">確認</button>
-                    </form>
-                    <form action={updateAppointmentStatus.bind(null, a.id, "cancelled")}>
-                      <button className="text-red-500 text-sm">取消</button>
-                    </form>
-                    <Link
-                      href={`/checkout?appointment=${a.id}`}
-                      className="text-sm underline text-primary-dark"
-                    >
-                      開單
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-          {todayAppointmentList?.length === 0 && (
-            <tr>
-              <td colSpan={5} className="py-6 px-3 text-center text-foreground/50">
-                今天還沒有預約
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <div className="flex flex-col gap-3">
+        {todayAppointmentList?.map((a) => {
+          const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
+          const service = Array.isArray(a.services) ? a.services[0] : a.services;
+          return (
+            <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
+              <div className="flex justify-between items-start mb-2 gap-3">
+                <div>
+                  <p className="font-semibold">
+                    {customer?.name}
+                    <span className="font-normal text-xs text-foreground/50 ml-2">
+                      {customer?.phone}
+                    </span>
+                  </p>
+                  <p className="text-sm text-foreground/70">{service?.name}</p>
+                  <p className="text-xs text-foreground/50">
+                    {new Date(a.start_time).toLocaleTimeString("zh-TW", {
+                      timeZone: "Asia/Taipei",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <span
+                  className={`text-sm px-2 py-1 rounded-full whitespace-nowrap ${
+                    a.status === "confirmed"
+                      ? "bg-primary-light text-primary-dark"
+                      : a.status === "cancelled"
+                      ? "bg-red-50 text-red-500"
+                      : a.status === "completed"
+                      ? "bg-primary-light text-primary-dark"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
+                >
+                  {statusLabel[a.status] ?? a.status}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <form action={updateAppointmentStatus.bind(null, a.id, "confirmed")}>
+                  <button className="text-primary-dark text-sm underline">確認</button>
+                </form>
+                <form action={updateAppointmentStatus.bind(null, a.id, "cancelled")}>
+                  <button className="text-red-500 text-sm underline">取消</button>
+                </form>
+                <Link
+                  href={`/checkout?appointment=${a.id}`}
+                  className="text-sm underline text-primary-dark"
+                >
+                  開單
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+        {todayAppointmentList?.length === 0 && (
+          <p className="text-center text-foreground/50 py-6">今天還沒有預約</p>
+        )}
       </div>
     </main>
   );
