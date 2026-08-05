@@ -26,7 +26,7 @@ export async function getBusyIntervals(
 
   let query = supabase
     .from("appointments")
-    .select("id, start_time, status, staff_id, services(duration_minutes)")
+    .select("id, start_time, status, staff_id, services(duration_minutes, buffer_minutes)")
     .neq("status", "cancelled")
     .gte("start_time", dayStart)
     .lte("start_time", dayEnd);
@@ -43,7 +43,8 @@ export async function getBusyIntervals(
       const service = Array.isArray(a.services) ? a.services[0] : a.services;
       const start = new Date(a.start_time).getTime();
       const duration = service?.duration_minutes ?? 60;
-      return { start, end: start + duration * 60_000 };
+      const buffer = service?.buffer_minutes ?? 0;
+      return { start, end: start + (duration + buffer) * 60_000 };
     });
 }
 
@@ -87,13 +88,13 @@ export async function findAvailableStaff(
 export async function getAvailableSlots(serviceId: string, date: string, staffId?: string) {
   const { data: service } = await supabase
     .from("services")
-    .select("duration_minutes")
+    .select("duration_minutes, buffer_minutes")
     .eq("id", serviceId)
     .single();
 
   if (!service) return [];
 
-  const durationMs = service.duration_minutes * 60_000;
+  const durationMs = (service.duration_minutes + (service.buffer_minutes ?? 0)) * 60_000;
 
   let busyLists: BusyInterval[][];
   if (staffId) {
@@ -200,10 +201,10 @@ export async function createBooking(formData: FormData) {
 
   const { data: service } = await supabase
     .from("services")
-    .select("duration_minutes")
+    .select("duration_minutes, buffer_minutes")
     .eq("id", service_id)
     .single();
-  const durationMs = (service?.duration_minutes ?? 60) * 60_000;
+  const durationMs = ((service?.duration_minutes ?? 60) + (service?.buffer_minutes ?? 0)) * 60_000;
   const startMs = new Date(start_time).getTime();
 
   const { ok, staffId } = await findAvailableStaff(date, startMs, startMs + durationMs, requestedStaffId);

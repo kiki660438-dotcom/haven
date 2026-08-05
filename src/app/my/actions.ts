@@ -34,7 +34,7 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
 
   const { data: appointment } = await supabase
     .from("appointments")
-    .select("id, customer_id, staff_id, service_id, services(duration_minutes)")
+    .select("id, customer_id, staff_id, service_id, services(duration_minutes, buffer_minutes)")
     .eq("id", appointmentId)
     .single();
 
@@ -43,7 +43,7 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
   }
 
   const service = Array.isArray(appointment.services) ? appointment.services[0] : appointment.services;
-  const durationMs = (service?.duration_minutes ?? 60) * 60_000;
+  const durationMs = ((service?.duration_minutes ?? 60) + (service?.buffer_minutes ?? 0)) * 60_000;
   const start_time = `${date}T${time}:00+08:00`;
   const startMs = new Date(start_time).getTime();
 
