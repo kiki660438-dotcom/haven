@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { createOrder } from "./actions";
 import { useSession } from "../vouchers/actions";
+import CustomerPicker from "./CustomerPicker";
 
 export default async function CheckoutPage({
   searchParams,
@@ -11,7 +12,7 @@ export default async function CheckoutPage({
   const supabase = await createClient();
 
   const [{ data: customers }, { data: services }, { data: staffList }] = await Promise.all([
-    supabase.from("customers").select("*").order("name"),
+    supabase.from("customers").select("id, name, phone").order("name"),
     supabase.from("services").select("*").order("name"),
     supabase.from("staff").select("*").eq("active", true).order("name"),
   ]);
@@ -27,6 +28,10 @@ export default async function CheckoutPage({
   }
 
   const customerId = appointment?.customer_id ?? selectedCustomerId ?? "";
+  const selectedCustomer = customers?.find((c) => c.id === customerId);
+  const customerLabel = selectedCustomer
+    ? `${selectedCustomer.name}（${selectedCustomer.phone ?? ""}）`
+    : undefined;
 
   const regularServices = services?.filter((s) => !s.total_sessions) ?? [];
   const packageServices = services?.filter((s) => s.total_sessions) ?? [];
@@ -64,18 +69,12 @@ export default async function CheckoutPage({
           className="flex flex-col gap-3 mb-6 p-4 border border-primary-light rounded-xl bg-white"
         >
           <label className="block text-sm text-foreground/60">選擇客戶查看商品券</label>
-          <select
+          <CustomerPicker
+            customers={customers ?? []}
             name="customer_id"
-            defaultValue={customerId}
-            className="w-full border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-          >
-            <option value="">現場客（未選擇）</option>
-            {customers?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}（{c.phone}）
-              </option>
-            ))}
-          </select>
+            defaultCustomerId={customerId}
+            defaultLabel={customerLabel}
+          />
           <button
             type="submit"
             className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
@@ -95,18 +94,12 @@ export default async function CheckoutPage({
 
         <div>
           <label className="block text-sm mb-1 text-foreground/60">選擇客戶</label>
-          <select
+          <CustomerPicker
+            customers={customers ?? []}
             name="customer_id"
-            defaultValue={customerId}
-            className="w-full border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-          >
-            <option value="">現場客（未選擇）</option>
-            {customers?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}（{c.phone}）
-              </option>
-            ))}
-          </select>
+            defaultCustomerId={customerId}
+            defaultLabel={customerLabel}
+          />
         </div>
 
         <input
