@@ -31,7 +31,9 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id, start_time, status, customers(name, phone), services(name, price)")
+      .select(
+        "id, start_time, status, customers(name, phone), services(name, price), appointment_services(services(name, price))"
+      )
       .gte("start_time", start)
       .lte("start_time", end)
       .order("start_time", { ascending: true }),
@@ -86,7 +88,11 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-3">
         {todayAppointmentList?.map((a) => {
           const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
-          const service = Array.isArray(a.services) ? a.services[0] : a.services;
+          const linked = (a.appointment_services ?? [])
+            .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
+            .filter((s): s is { name: string; price: number } => !!s);
+          const single = Array.isArray(a.services) ? a.services[0] : a.services;
+          const services = linked.length > 0 ? linked : single ? [single] : [];
           return (
             <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
               <div className="flex justify-between items-start mb-2 gap-3">
@@ -97,7 +103,7 @@ export default async function DashboardPage() {
                       {customer?.phone}
                     </span>
                   </p>
-                  <p className="text-sm text-foreground/70">{service?.name}</p>
+                  <p className="text-sm text-foreground/70">{services.map((s) => s.name).join("、")}</p>
                   <p className="text-xs text-foreground/50">
                     {new Date(a.start_time).toLocaleTimeString("zh-TW", {
                       timeZone: "Asia/Taipei",

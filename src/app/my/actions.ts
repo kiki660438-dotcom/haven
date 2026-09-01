@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
-import { findAvailableStaff } from "../book/actions";
+import { findAvailableStaff, getServicesDuration } from "../book/actions";
 
 export async function cancelMyAppointment(appointmentId: string) {
   const cookieStore = await cookies();
@@ -34,7 +34,7 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
 
   const { data: appointment } = await supabase
     .from("appointments")
-    .select("id, customer_id, staff_id, service_id, services(duration_minutes, buffer_minutes)")
+    .select("id, customer_id, staff_id, service_id, appointment_services(service_id)")
     .eq("id", appointmentId)
     .single();
 
@@ -42,8 +42,11 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
     redirect("/my");
   }
 
-  const service = Array.isArray(appointment.services) ? appointment.services[0] : appointment.services;
-  const durationMs = ((service?.duration_minutes ?? 60) + (service?.buffer_minutes ?? 0)) * 60_000;
+  const linkedServiceIds = appointment.appointment_services?.length
+    ? appointment.appointment_services.map((row) => row.service_id)
+    : [appointment.service_id];
+  const { totalDuration, maxBuffer } = await getServicesDuration(linkedServiceIds);
+  const durationMs = (totalDuration + maxBuffer) * 60_000;
   const start_time = `${date}T${time}:00+08:00`;
   const startMs = new Date(start_time).getTime();
 

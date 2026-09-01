@@ -26,7 +26,9 @@ export default async function AppointmentsPage() {
   const supabase = await createClient();
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, start_time, status, buffer_minutes, customers(name, phone), services(name, price, buffer_minutes)")
+    .select(
+      "id, start_time, status, buffer_minutes, customers(name, phone), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
+    )
     .order("start_time", { ascending: true });
 
   return (
@@ -36,7 +38,13 @@ export default async function AppointmentsPage() {
       <div className="flex flex-col gap-3">
         {appointments?.map((a) => {
           const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
-          const service = Array.isArray(a.services) ? a.services[0] : a.services;
+          const linked = (a.appointment_services ?? [])
+            .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
+            .filter((s): s is { name: string; price: number; buffer_minutes: number | null } => !!s);
+          const single = Array.isArray(a.services) ? a.services[0] : a.services;
+          const services = linked.length > 0 ? linked : single ? [single] : [];
+          const totalPrice = services.reduce((sum, s) => sum + (s.price ?? 0), 0);
+          const maxServiceBuffer = services.reduce((max, s) => Math.max(max, s.buffer_minutes ?? 0), 0);
           return (
             <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
               <div className="flex justify-between items-start mb-2 gap-3">
@@ -48,7 +56,7 @@ export default async function AppointmentsPage() {
                     </span>
                   </p>
                   <p className="text-sm text-foreground/70">
-                    {service?.name}（${service?.price}）
+                    {services.map((s) => s.name).join("、")}（${totalPrice}）
                   </p>
                   <p className="text-xs text-foreground/50">
                     {new Date(a.start_time).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
@@ -72,9 +80,19 @@ export default async function AppointmentsPage() {
                     <span className="text-xs text-foreground/50 whitespace-nowrap">緩衝</span>
                     <input
                       type="number"
+                      name="buffer_hours"
+                      min={0}
+                      defaultValue={Math.floor((a.buffer_minutes ?? maxServiceBuffer) / 60)}
+                      className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
+                    />
+                    <span className="text-xs text-foreground/50">時</span>
+                    <input
+                      type="number"
                       name="buffer_minutes"
-                      defaultValue={a.buffer_minutes ?? service?.buffer_minutes ?? 0}
-                      className="w-14 border border-primary-light rounded-lg px-2 py-1 text-sm"
+                      min={0}
+                      max={59}
+                      defaultValue={(a.buffer_minutes ?? maxServiceBuffer) % 60}
+                      className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
                     />
                     <span className="text-xs text-foreground/50">分</span>
                     <button type="submit" className="text-primary-dark text-sm underline whitespace-nowrap">

@@ -11,6 +11,22 @@ const statusLabel: Record<string, string> = {
   completed: "已完成",
 };
 
+type ServiceItem = { name: string; price: number };
+type ServiceRef = ServiceItem | ServiceItem[] | null;
+
+function displayServices(
+  services: ServiceRef,
+  linked: { services: ServiceRef }[] | null | undefined
+): ServiceItem[] {
+  if (linked && linked.length > 0) {
+    return linked
+      .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
+      .filter((s): s is ServiceItem => !!s);
+  }
+  const single = Array.isArray(services) ? services[0] : services;
+  return single ? [single] : [];
+}
+
 export default async function MyPage({
   searchParams,
 }: {
@@ -74,7 +90,9 @@ export default async function MyPage({
   const [{ data: appointments }, { data: vouchers }] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id, start_time, status, service_id, staff_id, services(name, price)")
+      .select(
+        "id, start_time, status, service_id, staff_id, services(name, price), appointment_services(service_id, services(name, price))"
+      )
       .eq("customer_id", identity.customerId)
       .order("start_time", { ascending: false }),
     supabase
@@ -94,10 +112,15 @@ export default async function MyPage({
   const reschedulingAppointment = reschedule
     ? upcoming.find((a) => a.id === reschedule)
     : undefined;
+  const reschedulingServiceIds = reschedulingAppointment
+    ? reschedulingAppointment.appointment_services?.length
+      ? reschedulingAppointment.appointment_services.map((row) => row.service_id)
+      : [reschedulingAppointment.service_id]
+    : [];
   const rescheduleSlots =
     reschedulingAppointment && r_date
       ? await getAvailableSlots(
-          reschedulingAppointment.service_id,
+          reschedulingServiceIds,
           r_date,
           reschedulingAppointment.staff_id ?? undefined
         )
@@ -134,13 +157,13 @@ export default async function MyPage({
       <h2 className="font-semibold mb-3">即將到來的預約</h2>
       <div className="flex flex-col gap-2 mb-6">
         {upcoming.map((a) => {
-          const service = Array.isArray(a.services) ? a.services[0] : a.services;
+          const services = displayServices(a.services, a.appointment_services);
           const isRescheduling = reschedule === a.id;
           return (
             <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium">{service?.name}</p>
+                  <p className="font-medium">{services.map((s) => s.name).join("、")}</p>
                   <p className="text-sm text-foreground/60">
                     {new Date(a.start_time).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
                     {" ・ "}
@@ -237,13 +260,13 @@ export default async function MyPage({
       <h2 className="font-semibold mb-3">歷史預約</h2>
       <div className="flex flex-col gap-2">
         {past.map((a) => {
-          const service = Array.isArray(a.services) ? a.services[0] : a.services;
+          const services = displayServices(a.services, a.appointment_services);
           return (
             <div
               key={a.id}
               className="p-3 border border-primary-light rounded-xl bg-white text-sm text-foreground/70 flex items-center justify-between"
             >
-              <span>{service?.name}</span>
+              <span>{services.map((s) => s.name).join("、")}</span>
               <span>
                 {new Date(a.start_time).toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei" })}
                 {" ・ "}

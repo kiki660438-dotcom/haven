@@ -3,18 +3,28 @@ import { supabase } from "@/lib/supabase";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
 import { createBooking, getAvailableSlots, verifyPhone, logoutCustomer } from "./actions";
 
+function buildQuery(serviceIds: string[], date: string, staffId?: string) {
+  const params = new URLSearchParams();
+  for (const id of serviceIds) params.append("service_id", id);
+  params.set("date", date ?? "");
+  params.set("staff_id", staffId ?? "");
+  return params.toString();
+}
+
 export default async function BookPage({
   searchParams,
 }: {
   searchParams: Promise<{
     success?: string;
     error?: string;
-    service_id?: string;
+    service_id?: string | string[];
     date?: string;
     staff_id?: string;
   }>;
 }) {
   const { success, error, service_id, date, staff_id } = await searchParams;
+  const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
+
   const [{ data: allServices }, { data: staffList }] = await Promise.all([
     supabase.from("services").select("*").order("name"),
     supabase.from("staff").select("id, name").eq("active", true).order("name"),
@@ -24,12 +34,12 @@ export default async function BookPage({
   const services = allServices?.filter((s) => !s.total_sessions && !s.hide_from_booking);
 
   const slots =
-    service_id && date ? await getAvailableSlots(service_id, date, staff_id) : null;
+    serviceIds.length > 0 && date ? await getAvailableSlots(serviceIds, date, staff_id) : null;
 
   const cookieStore = await cookies();
   const identity = verifyCustomerToken(cookieStore.get(CUSTOMER_COOKIE)?.value);
 
-  const returnTo = `/book?service_id=${service_id ?? ""}&date=${date ?? ""}&staff_id=${staff_id ?? ""}`;
+  const returnTo = `/book?${buildQuery(serviceIds, date ?? "", staff_id)}`;
   const lineLoginUrl = `/api/line/login?returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
@@ -53,7 +63,7 @@ export default async function BookPage({
       )}
       {error === "no_slot" && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
-          請選擇一個可預約時段。
+          請至少選擇一項服務，並選一個可預約時段。
         </div>
       )}
       {error === "no_identity" && (
@@ -72,19 +82,25 @@ export default async function BookPage({
         action="/book"
         className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white mb-6"
       >
-        <select
-          name="service_id"
-          required
-          defaultValue={service_id ?? ""}
-          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-        >
-          <option value="">選擇服務 *</option>
-          {services?.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}（${s.price}）
-            </option>
-          ))}
-        </select>
+        <div>
+          <p className="text-sm mb-2 text-foreground/60">選擇服務 *（可複選）</p>
+          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto border border-primary-light rounded-lg p-2">
+            {services?.map((s) => (
+              <label
+                key={s.id}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light"
+              >
+                <input
+                  type="checkbox"
+                  name="service_id"
+                  value={s.id}
+                  defaultChecked={serviceIds.includes(s.id)}
+                />
+                {s.name}（${s.price}）
+              </label>
+            ))}
+          </div>
+        </div>
         <input
           name="date"
           type="date"
@@ -119,7 +135,9 @@ export default async function BookPage({
           </p>
 
           <form action={verifyPhone} className="flex flex-col gap-3">
-            <input type="hidden" name="service_id" value={service_id} />
+            {serviceIds.map((id) => (
+              <input key={id} type="hidden" name="service_id" value={id} />
+            ))}
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="return_to" value={returnTo} />
             <input
@@ -178,7 +196,9 @@ export default async function BookPage({
         <div className="flex items-center justify-between p-3 mb-4 rounded-lg bg-primary-light text-primary-dark text-sm">
           <span>哈囉，{identity.name}！</span>
           <form action={logoutCustomer}>
-            <input type="hidden" name="service_id" value={service_id} />
+            {serviceIds.map((id) => (
+              <input key={id} type="hidden" name="service_id" value={id} />
+            ))}
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="return_to" value={returnTo} />
             <button type="submit" className="underline">
@@ -193,7 +213,9 @@ export default async function BookPage({
           action={createBooking}
           className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white"
         >
-          <input type="hidden" name="service_id" value={service_id} />
+          {serviceIds.map((id) => (
+            <input key={id} type="hidden" name="service_id" value={id} />
+          ))}
           <input type="hidden" name="date" value={date} />
           <input type="hidden" name="staff_id" value={staff_id ?? ""} />
           <input type="hidden" name="customer_id" value={identity.customerId} />

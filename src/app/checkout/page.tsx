@@ -18,13 +18,19 @@ export default async function CheckoutPage({
   ]);
 
   let appointment = null;
+  let appointmentServiceIds: string[] = [];
   if (appointmentId) {
     const { data } = await supabase
       .from("appointments")
-      .select("id, customer_id, service_id")
+      .select("id, customer_id, service_id, appointment_services(service_id)")
       .eq("id", appointmentId)
       .maybeSingle();
     appointment = data;
+    appointmentServiceIds = data?.appointment_services?.length
+      ? data.appointment_services.map((row) => row.service_id)
+      : data?.service_id
+      ? [data.service_id]
+      : [];
   }
 
   const customerId = appointment?.customer_id ?? selectedCustomerId ?? "";
@@ -140,7 +146,7 @@ export default async function CheckoutPage({
                   type="number"
                   name={`qty_${s.id}`}
                   min={0}
-                  defaultValue={appointment?.service_id === s.id ? 1 : 0}
+                  defaultValue={appointmentServiceIds.includes(s.id) ? 1 : 0}
                   className="w-20 border border-primary-light rounded-lg px-2 py-1 text-center"
                 />
               </div>

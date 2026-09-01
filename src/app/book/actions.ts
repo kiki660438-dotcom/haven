@@ -15,6 +15,21 @@ const CLOSE_HOUR = 18;
 const SLOT_STEP_MINUTES = 30;
 
 type BusyInterval = { start: number; end: number };
+type ServiceDuration = { duration_minutes: number; buffer_minutes: number | null };
+
+function combinedDurationBuffer(services: ServiceDuration[]) {
+  const totalDuration = services.reduce((sum, s) => sum + (s.duration_minutes ?? 60), 0);
+  const maxBuffer = services.reduce((max, s) => Math.max(max, s.buffer_minutes ?? 0), 0);
+  return { totalDuration, maxBuffer };
+}
+
+export async function getServicesDuration(serviceIds: string[]) {
+  const { data } = await supabase
+    .from("services")
+    .select("duration_minutes, buffer_minutes")
+    .in("id", serviceIds);
+  return combinedDurationBuffer(data ?? []);
+}
 
 export async function getBusyIntervals(
   date: string,
@@ -26,7 +41,9 @@ export async function getBusyIntervals(
 
   let query = supabase
     .from("appointments")
-    .select("id, start_time, status, staff_id, buffer_minutes, services(duration_minutes, buffer_minutes)")
+    .select(
+      "id, start_time, status, staff_id, buffer_minutes, services(duration_minutes, buffer_minutes), appointment_services(services(duration_minutes, buffer_minutes))"
+    )
     .neq("status", "cancelled")
     .gte("start_time", dayStart)
     .lte("start_time", dayEnd);
@@ -40,11 +57,25 @@ export async function getBusyIntervals(
   return (appointments ?? [])
     .filter((a) => a.id !== excludeAppointmentId)
     .map((a) => {
-      const service = Array.isArray(a.services) ? a.services[0] : a.services;
+      const linked = (a.appointment_services ?? [])
+        .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
+        .filter((s): s is ServiceDuration => !!s);
+
+      let duration: number;
+      let serviceBuffer: number;
+      if (linked.length > 0) {
+        const combo = combinedDurationBuffer(linked);
+        duration = combo.totalDuration;
+        serviceBuffer = combo.maxBuffer;
+      } else {
+        const service = Array.isArray(a.services) ? a.services[0] : a.services;
+        duration = service?.duration_minutes ?? 60;
+        serviceBuffer = service?.buffer_minutes ?? 0;
+      }
+
       const start = new Date(a.start_time).getTime();
-      const duration = service?.duration_minutes ?? 60;
       // 每筆預約可以自己覆寫緩衝時間（在「預約管理」設定），沒設過就用服務項目的預設值
-      const buffer = a.buffer_minutes ?? service?.buffer_minutes ?? 0;
+      const buffer = a.buffer_minutes ?? serviceBuffer;
       return { start, end: start + (duration + buffer) * 60_000 };
     });
 }
@@ -86,16 +117,13 @@ export async function findAvailableStaff(
   return { ok: false, staffId: null };
 }
 
-export async function getAvailableSlots(serviceId: string, date: string, staffId?: string) {
-  const { data: service } = await supabase
-    .from("services")
-    .select("duration_minutes, buffer_minutes")
-    .eq("id", serviceId)
-    .single();
+export async function getAvailableSlots(serviceIds: string[], date: string, staffId?: string) {
+  if (serviceIds.length === 0) return [];
 
-  if (!service) return [];
+  const { totalDuration, maxBuffer } = await getServicesDuration(serviceIds);
+  if (totalDuration === 0) return [];
 
-  const durationMs = (service.duration_minutes + (service.buffer_minutes ?? 0)) * 60_000;
+  const durationMs = (totalDuration + maxBuffer) * 60_000;
 
   let busyLists: BusyInterval[][];
   if (staffId) {
@@ -185,42 +213,57 @@ export async function logoutCustomer(formData: FormData) {
 
 export async function createBooking(formData: FormData) {
   const customer_id = formData.get("customer_id") as string;
-  const service_id = formData.get("service_id") as string;
+  const service_ids = formData.getAll("service_id") as string[];
   const date = formData.get("date") as string;
   const time = formData.get("time") as string;
   const requestedStaffId = (formData.get("staff_id") as string) || null;
+  const query = `service_id=${service_ids.join(",")}&date=${date}`;
 
   if (!customer_id) {
-    redirect(`/book?service_id=${service_id}&date=${date}&error=no_identity`);
+    redirect(`/book?${query}&error=no_identity`);
+  }
+
+  if (service_ids.length === 0) {
+    redirect(`/book?${query}&error=no_slot`);
   }
 
   if (!time) {
-    redirect(`/book?service_id=${service_id}&date=${date}&error=no_slot`);
+    redirect(`/book?${query}&error=no_slot`);
   }
 
   const start_time = `${date}T${time}:00+08:00`;
 
-  const { data: service } = await supabase
-    .from("services")
-    .select("duration_minutes, buffer_minutes")
-    .eq("id", service_id)
-    .single();
-  const durationMs = ((service?.duration_minutes ?? 60) + (service?.buffer_minutes ?? 0)) * 60_000;
+  const { totalDuration, maxBuffer } = await getServicesDuration(service_ids);
+  const durationMs = (totalDuration + maxBuffer) * 60_000;
   const startMs = new Date(start_time).getTime();
 
   const { ok, staffId } = await findAvailableStaff(date, startMs, startMs + durationMs, requestedStaffId);
   if (!ok) {
-    redirect(`/book?service_id=${service_id}&date=${date}&error=conflict`);
+    redirect(`/book?${query}&error=conflict`);
   }
 
-  await supabase.from("appointments").insert({
-    customer_id,
-    service_id,
-    start_time,
-    status: "pending",
-    staff_id: staffId,
-    buffer_minutes: service?.buffer_minutes ?? 0,
-  });
+  const { data: appointment, error } = await supabase
+    .from("appointments")
+    .insert({
+      customer_id,
+      service_id: service_ids[0],
+      start_time,
+      status: "pending",
+      staff_id: staffId,
+      buffer_minutes: maxBuffer,
+    })
+    .select("id")
+    .single();
+
+  if (error || !appointment) {
+    redirect(`/book?${query}&error=conflict`);
+  }
+
+  if (service_ids.length > 1) {
+    await supabase
+      .from("appointment_services")
+      .insert(service_ids.map((service_id) => ({ appointment_id: appointment.id, service_id })));
+  }
 
   revalidatePath("/book");
   revalidatePath("/appointments");
