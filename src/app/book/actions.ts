@@ -14,36 +14,18 @@ const OPEN_HOUR = 11;
 const CLOSE_HOUR = 18;
 const SLOT_STEP_MINUTES = 30;
 
-type BusyInterval = { start: number; end: number };
-type ServiceDuration = { duration_minutes: number; buffer_minutes: number | null };
-
-function combinedDurationBuffer(services: ServiceDuration[]) {
-  const totalDuration = services.reduce((sum, s) => sum + (s.duration_minutes ?? 60), 0);
-  const maxBuffer = services.reduce((max, s) => Math.max(max, s.buffer_minutes ?? 0), 0);
-  return { totalDuration, maxBuffer };
-}
-
-export async function getServicesDuration(serviceIds: string[]) {
-  const { data } = await supabase
-    .from("services")
-    .select("duration_minutes, buffer_minutes")
-    .in("id", serviceIds);
-  return combinedDurationBuffer(data ?? []);
-}
-
-export async function getBusyIntervals(
+// 只看某個時間點本身有沒有被預約走，不會因為服務時長而連帶擋住後面的時段
+async function getBusyStartTimes(
   date: string,
   staffId?: string | null,
   excludeAppointmentId?: string
-): Promise<BusyInterval[]> {
+): Promise<number[]> {
   const dayStart = `${date}T00:00:00+08:00`;
   const dayEnd = `${date}T23:59:59+08:00`;
 
   let query = supabase
     .from("appointments")
-    .select(
-      "id, start_time, status, staff_id, buffer_minutes, services(duration_minutes, buffer_minutes), appointment_services(services(duration_minutes, buffer_minutes))"
-    )
+    .select("id, start_time, status, staff_id")
     .neq("status", "cancelled")
     .gte("start_time", dayStart)
     .lte("start_time", dayEnd);
@@ -56,32 +38,12 @@ export async function getBusyIntervals(
 
   return (appointments ?? [])
     .filter((a) => a.id !== excludeAppointmentId)
-    .map((a) => {
-      const linked = (a.appointment_services ?? [])
-        .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
-        .filter((s): s is ServiceDuration => !!s);
-
-      let duration: number;
-      let serviceBuffer: number;
-      if (linked.length > 0) {
-        const combo = combinedDurationBuffer(linked);
-        duration = combo.totalDuration;
-        serviceBuffer = combo.maxBuffer;
-      } else {
-        const service = Array.isArray(a.services) ? a.services[0] : a.services;
-        duration = service?.duration_minutes ?? 60;
-        serviceBuffer = service?.buffer_minutes ?? 0;
-      }
-
-      const start = new Date(a.start_time).getTime();
-      // 每筆預約可以自己覆寫緩衝時間（在「預約管理」設定），沒設過就用服務項目的預設值
-      const buffer = a.buffer_minutes ?? serviceBuffer;
-      return { start, end: start + (duration + buffer) * 60_000 };
-    });
+    .map((a) => new Date(a.start_time).getTime());
 }
 
-function overlaps(startA: number, endA: number, busy: BusyInterval[]) {
-  return busy.some((b) => startA < b.end && endA > b.start);
+async function getMaxBuffer(serviceIds: string[]): Promise<number> {
+  const { data } = await supabase.from("services").select("buffer_minutes").in("id", serviceIds);
+  return (data ?? []).reduce((max, s) => Math.max(max, s.buffer_minutes ?? 0), 0);
 }
 
 async function getActiveStaffIds(): Promise<string[]> {
@@ -89,28 +51,27 @@ async function getActiveStaffIds(): Promise<string[]> {
   return data?.map((s) => s.id) ?? [];
 }
 
-// 找出在指定時段有空的員工：客人有指定設計師就只看那個人；沒指定就從所有在職員工裡找一個有空的（找不到就退回「全店共用行事曆」判斷，適用還沒建立員工資料的情況）
+// 找出在指定時間點有空的員工：客人有指定設計師就只看那個人；沒指定就從所有在職員工裡找一個有空的（找不到就退回「全店共用行事曆」判斷，適用還沒建立員工資料的情況）
 export async function findAvailableStaff(
   date: string,
   startMs: number,
-  endMs: number,
   requestedStaffId?: string | null,
   excludeAppointmentId?: string
 ): Promise<{ ok: boolean; staffId: string | null }> {
   if (requestedStaffId) {
-    const busy = await getBusyIntervals(date, requestedStaffId, excludeAppointmentId);
-    return { ok: !overlaps(startMs, endMs, busy), staffId: requestedStaffId };
+    const busy = await getBusyStartTimes(date, requestedStaffId, excludeAppointmentId);
+    return { ok: !busy.includes(startMs), staffId: requestedStaffId };
   }
 
   const activeStaffIds = await getActiveStaffIds();
   if (activeStaffIds.length === 0) {
-    const busy = await getBusyIntervals(date, null, excludeAppointmentId);
-    return { ok: !overlaps(startMs, endMs, busy), staffId: null };
+    const busy = await getBusyStartTimes(date, null, excludeAppointmentId);
+    return { ok: !busy.includes(startMs), staffId: null };
   }
 
   for (const staffId of activeStaffIds) {
-    const busy = await getBusyIntervals(date, staffId, excludeAppointmentId);
-    if (!overlaps(startMs, endMs, busy)) {
+    const busy = await getBusyStartTimes(date, staffId, excludeAppointmentId);
+    if (!busy.includes(startMs)) {
       return { ok: true, staffId };
     }
   }
@@ -120,20 +81,15 @@ export async function findAvailableStaff(
 export async function getAvailableSlots(serviceIds: string[], date: string, staffId?: string) {
   if (serviceIds.length === 0) return [];
 
-  const { totalDuration, maxBuffer } = await getServicesDuration(serviceIds);
-  if (totalDuration === 0) return [];
-
-  const durationMs = (totalDuration + maxBuffer) * 60_000;
-
-  let busyLists: BusyInterval[][];
+  let busyLists: number[][];
   if (staffId) {
-    busyLists = [await getBusyIntervals(date, staffId)];
+    busyLists = [await getBusyStartTimes(date, staffId)];
   } else {
     const activeStaffIds = await getActiveStaffIds();
     if (activeStaffIds.length > 0) {
-      busyLists = await Promise.all(activeStaffIds.map((id) => getBusyIntervals(date, id)));
+      busyLists = await Promise.all(activeStaffIds.map((id) => getBusyStartTimes(date, id)));
     } else {
-      busyLists = [await getBusyIntervals(date, null)];
+      busyLists = [await getBusyStartTimes(date, null)];
     }
   }
 
@@ -141,13 +97,8 @@ export async function getAvailableSlots(serviceIds: string[], date: string, staf
   const dayClose = new Date(`${date}T${String(CLOSE_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
 
   const slots: string[] = [];
-  for (
-    let slotStart = dayOpen;
-    slotStart + durationMs <= dayClose;
-    slotStart += SLOT_STEP_MINUTES * 60_000
-  ) {
-    const slotEnd = slotStart + durationMs;
-    const freeSomewhere = busyLists.some((busy) => !overlaps(slotStart, slotEnd, busy));
+  for (let slotStart = dayOpen; slotStart < dayClose; slotStart += SLOT_STEP_MINUTES * 60_000) {
+    const freeSomewhere = busyLists.some((busy) => !busy.includes(slotStart));
     if (freeSomewhere) {
       const d = new Date(slotStart);
       const hh = String((d.getUTCHours() + 8) % 24).padStart(2, "0");
@@ -232,15 +183,14 @@ export async function createBooking(formData: FormData) {
   }
 
   const start_time = `${date}T${time}:00+08:00`;
-
-  const { totalDuration, maxBuffer } = await getServicesDuration(service_ids);
-  const durationMs = (totalDuration + maxBuffer) * 60_000;
   const startMs = new Date(start_time).getTime();
 
-  const { ok, staffId } = await findAvailableStaff(date, startMs, startMs + durationMs, requestedStaffId);
+  const { ok, staffId } = await findAvailableStaff(date, startMs, requestedStaffId);
   if (!ok) {
     redirect(`/book?${query}&error=conflict`);
   }
+
+  const maxBuffer = await getMaxBuffer(service_ids);
 
   const { data: appointment, error } = await supabase
     .from("appointments")

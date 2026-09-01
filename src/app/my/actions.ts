@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
-import { findAvailableStaff, getServicesDuration } from "../book/actions";
+import { findAvailableStaff } from "../book/actions";
 
 export async function cancelMyAppointment(appointmentId: string) {
   const cookieStore = await cookies();
@@ -34,7 +34,7 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
 
   const { data: appointment } = await supabase
     .from("appointments")
-    .select("id, customer_id, staff_id, service_id, appointment_services(service_id)")
+    .select("id, customer_id, staff_id")
     .eq("id", appointmentId)
     .single();
 
@@ -42,21 +42,10 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
     redirect("/my");
   }
 
-  const linkedServiceIds = appointment.appointment_services?.length
-    ? appointment.appointment_services.map((row) => row.service_id)
-    : [appointment.service_id];
-  const { totalDuration, maxBuffer } = await getServicesDuration(linkedServiceIds);
-  const durationMs = (totalDuration + maxBuffer) * 60_000;
   const start_time = `${date}T${time}:00+08:00`;
   const startMs = new Date(start_time).getTime();
 
-  const { ok } = await findAvailableStaff(
-    date,
-    startMs,
-    startMs + durationMs,
-    appointment.staff_id,
-    appointmentId
-  );
+  const { ok } = await findAvailableStaff(date, startMs, appointment.staff_id, appointmentId);
 
   if (!ok) {
     redirect(`/my?reschedule=${appointmentId}&r_date=${date}&error=conflict`);
