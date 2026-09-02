@@ -48,7 +48,14 @@ export async function updateAppointmentTime(id: string, formData: FormData) {
   if (!date || !time) return;
 
   const start_time = `${date}T${time}:00+08:00`;
-  await supabase.from("appointments").update({ start_time, buffer_minutes }).eq("id", id);
+  const { error } = await supabase
+    .from("appointments")
+    .update({ start_time, buffer_minutes })
+    .eq("id", id);
+  if (error) {
+    console.error("updateAppointmentTime failed", error);
+    throw new Error(`更新失敗：${error.message}`);
+  }
   revalidatePath("/appointments");
   revalidatePath("/dashboard");
 }

@@ -14,11 +14,13 @@ function toDateInputValue(iso: string) {
 }
 
 function toTimeInputValue(iso: string) {
+  // 用 hourCycle: "h23" 明確指定 00:00-23:59，避免 hour12:false 在部分環境把午夜格式化成
+  // "24:00" 這種 <input type="time"> 不接受的無效值，導致該欄位悄悄變空、送出時整筆更新被擋下
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Taipei",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   }).format(new Date(iso));
 }
 
@@ -63,7 +65,7 @@ export default async function AppointmentsPage() {
                   </p>
                   <form
                     action={updateAppointmentTime.bind(null, a.id)}
-                    className="flex items-center gap-2 mt-2"
+                    className="flex flex-wrap items-center gap-2 mt-2"
                   >
                     <input
                       type="date"
