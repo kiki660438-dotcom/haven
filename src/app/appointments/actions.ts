@@ -2,12 +2,14 @@
 
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { pushLineMessage } from "@/lib/line";
 
 export async function updateAppointmentStatus(id: string, status: string) {
   const supabase = await createClient();
   await supabase.from("appointments").update({ status }).eq("id", id);
   revalidatePath("/appointments");
+  revalidatePath("/appointments/calendar");
   revalidatePath("/dashboard");
 
   if (status === "confirmed") {
@@ -34,6 +36,14 @@ export async function updateAppointmentStatus(id: string, status: string) {
         customer.line_user_id,
         `您的預約已確認 ✅\n服務項目：${serviceNames.join("、")}\n時間：${time}\n期待您的光臨！`
       );
+    }
+
+    // 確認完直接跳到那個月的月曆總覽，方便馬上看到整體排程
+    if (appointment) {
+      const monthKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" })
+        .format(new Date(appointment.start_time))
+        .slice(0, 7);
+      redirect(`/appointments/calendar?month=${monthKey}`);
     }
   }
 }

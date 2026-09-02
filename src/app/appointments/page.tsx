@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, updateAppointmentTime } from "./actions";
-import { Check, X, ShoppingCart, ChevronDown } from "lucide-react";
+import { Check, X, ShoppingCart, ChevronDown, Calendar } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -52,16 +52,16 @@ type ServiceRow = { name: string; price: number; buffer_minutes: number | null }
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; date?: string }>;
 }) {
-  const { filter } = await searchParams;
-  const activeFilter = filter ?? "upcoming";
+  const { filter, date } = await searchParams;
+  const activeFilter = date ? "date" : filter ?? "upcoming";
 
   const supabase = await createClient();
   const { data: appointments } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, buffer_minutes, customers(name, phone), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
+      "id, start_time, status, buffer_minutes, customers(name, phone), staff(name), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
     )
     .order("start_time", { ascending: true });
 
@@ -74,6 +74,7 @@ export default async function AppointmentsPage({
   }));
 
   const filtered = withKey.filter((a) => {
+    if (activeFilter === "date") return a.dateKey === date;
     if (activeFilter === "pending") return a.status === "pending";
     if (activeFilter === "today") return a.dateKey === today && a.status !== "cancelled";
     if (activeFilter === "all") return true;
@@ -96,9 +97,17 @@ export default async function AppointmentsPage({
 
   return (
     <main className="max-w-3xl mx-auto p-8">
-      <h1 className="text-2xl font-bold text-primary-dark mb-4">預約管理</h1>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <h1 className="text-2xl font-bold text-primary-dark">預約管理</h1>
+        <Link
+          href="/appointments/calendar"
+          className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
+        >
+          <Calendar size={14} /> 月曆檢視
+        </Link>
+      </div>
 
-      <div className="flex gap-2 mb-6 flex-wrap">
+      <div className="flex gap-2 mb-6 flex-wrap items-center">
         {tabs.map((t) => (
           <Link
             key={t.key}
@@ -112,6 +121,11 @@ export default async function AppointmentsPage({
             {t.label}
           </Link>
         ))}
+        {activeFilter === "date" && date && (
+          <span className="px-3 py-1.5 rounded-full text-sm bg-foreground/10 text-foreground/70 whitespace-nowrap">
+            {date}
+          </span>
+        )}
       </div>
 
       {sortedKeys.length === 0 && (
@@ -125,6 +139,7 @@ export default async function AppointmentsPage({
             <div className="flex flex-col gap-3">
               {groups.get(key)!.map((a) => {
                 const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
+                const staff = Array.isArray(a.staff) ? a.staff[0] : a.staff;
                 const linked = (a.appointment_services ?? [])
                   .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
                   .filter((s): s is ServiceRow => !!s);
@@ -160,6 +175,11 @@ export default async function AppointmentsPage({
                       <span className="font-normal text-xs text-foreground/50 ml-2">
                         {customer?.phone}
                       </span>
+                      {staff?.name && (
+                        <span className="font-normal text-xs text-primary-dark ml-2">
+                          指定 {staff.name}
+                        </span>
+                      )}
                     </p>
                     <p className="text-sm text-foreground/70">
                       {services.map((s) => s.name).join("、")}（${totalPrice}）
