@@ -97,7 +97,7 @@ export async function getAvailableSlots(serviceIds: string[], date: string, staf
   const dayClose = new Date(`${date}T${String(CLOSE_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
 
   const slots: string[] = [];
-  for (let slotStart = dayOpen; slotStart < dayClose; slotStart += SLOT_STEP_MINUTES * 60_000) {
+  for (let slotStart = dayOpen; slotStart <= dayClose; slotStart += SLOT_STEP_MINUTES * 60_000) {
     const freeSomewhere = busyLists.some((busy) => !busy.includes(slotStart));
     if (freeSomewhere) {
       const d = new Date(slotStart);
