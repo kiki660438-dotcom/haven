@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, updateAppointmentTime } from "./actions";
+import { Check, X, ShoppingCart, ChevronDown } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
   confirmed: "已確認",
   cancelled: "已取消",
   completed: "已完成",
+};
+
+const statusStyle: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-700",
+  confirmed: "bg-primary-light text-primary-dark",
+  cancelled: "bg-red-50 text-red-500",
+  completed: "bg-gray-100 text-gray-500",
 };
 
 function toDateInputValue(iso: string) {
@@ -24,7 +32,31 @@ function toTimeInputValue(iso: string) {
   }).format(new Date(iso));
 }
 
-export default async function AppointmentsPage() {
+function todayKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+}
+
+function dateHeading(key: string) {
+  const d = new Date(`${key}T00:00:00+08:00`);
+  const weekday = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", weekday: "short" }).format(d);
+  const md = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    month: "long",
+    day: "numeric",
+  }).format(d);
+  return `${key === todayKey() ? "今天・" : ""}${md}（${weekday}）`;
+}
+
+type ServiceRow = { name: string; price: number; buffer_minutes: number | null };
+
+export default async function AppointmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const { filter } = await searchParams;
+  const activeFilter = filter ?? "upcoming";
+
   const supabase = await createClient();
   const { data: appointments } = await supabase
     .from("appointments")
@@ -33,109 +65,182 @@ export default async function AppointmentsPage() {
     )
     .order("start_time", { ascending: true });
 
+  const today = todayKey();
+  const pendingCount = appointments?.filter((a) => a.status === "pending").length ?? 0;
+
+  const withKey = (appointments ?? []).map((a) => ({
+    ...a,
+    dateKey: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date(a.start_time)),
+  }));
+
+  const filtered = withKey.filter((a) => {
+    if (activeFilter === "pending") return a.status === "pending";
+    if (activeFilter === "today") return a.dateKey === today && a.status !== "cancelled";
+    if (activeFilter === "all") return true;
+    return a.dateKey >= today && a.status !== "cancelled";
+  });
+
+  const groups = new Map<string, typeof filtered>();
+  for (const a of filtered) {
+    if (!groups.has(a.dateKey)) groups.set(a.dateKey, []);
+    groups.get(a.dateKey)!.push(a);
+  }
+  const sortedKeys = [...groups.keys()].sort();
+
+  const tabs = [
+    { key: "upcoming", label: "即將到來" },
+    { key: "pending", label: pendingCount > 0 ? `待確認 (${pendingCount})` : "待確認" },
+    { key: "today", label: "今天" },
+    { key: "all", label: "全部" },
+  ];
+
   return (
     <main className="max-w-3xl mx-auto p-8">
-      <h1 className="text-2xl font-bold text-primary-dark mb-6">預約管理</h1>
+      <h1 className="text-2xl font-bold text-primary-dark mb-4">預約管理</h1>
 
-      <div className="flex flex-col gap-3">
-        {appointments?.map((a) => {
-          const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
-          const linked = (a.appointment_services ?? [])
-            .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
-            .filter((s): s is { name: string; price: number; buffer_minutes: number | null } => !!s);
-          const single = Array.isArray(a.services) ? a.services[0] : a.services;
-          const services = linked.length > 0 ? linked : single ? [single] : [];
-          const totalPrice = services.reduce((sum, s) => sum + (s.price ?? 0), 0);
-          const maxServiceBuffer = services.reduce((max, s) => Math.max(max, s.buffer_minutes ?? 0), 0);
-          return (
-            <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
-              <div className="flex justify-between items-start mb-2 gap-3">
-                <div>
-                  <p className="font-semibold">
-                    {customer?.name}
-                    <span className="font-normal text-xs text-foreground/50 ml-2">
-                      {customer?.phone}
-                    </span>
-                  </p>
-                  <p className="text-sm text-foreground/70">
-                    {services.map((s) => s.name).join("、")}（${totalPrice}）
-                  </p>
-                  <p className="text-xs text-foreground/50">
-                    {new Date(a.start_time).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
-                  </p>
-                  <form
-                    action={updateAppointmentTime.bind(null, a.id)}
-                    className="flex flex-wrap items-center gap-2 mt-2"
-                  >
-                    <input
-                      type="date"
-                      name="date"
-                      defaultValue={toDateInputValue(a.start_time)}
-                      className="border border-primary-light rounded-lg px-2 py-1 text-sm"
-                    />
-                    <input
-                      type="time"
-                      name="time"
-                      defaultValue={toTimeInputValue(a.start_time)}
-                      className="border border-primary-light rounded-lg px-2 py-1 text-sm"
-                    />
-                    <span className="text-xs text-foreground/50 whitespace-nowrap">緩衝</span>
-                    <input
-                      type="number"
-                      name="buffer_hours"
-                      min={0}
-                      defaultValue={Math.floor((a.buffer_minutes ?? maxServiceBuffer) / 60)}
-                      className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
-                    />
-                    <span className="text-xs text-foreground/50">時</span>
-                    <input
-                      type="number"
-                      name="buffer_minutes"
-                      min={0}
-                      max={59}
-                      defaultValue={(a.buffer_minutes ?? maxServiceBuffer) % 60}
-                      className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
-                    />
-                    <span className="text-xs text-foreground/50">分</span>
-                    <button type="submit" className="text-primary-dark text-sm underline whitespace-nowrap">
-                      更新
-                    </button>
-                  </form>
-                </div>
-                <span
-                  className={`text-sm px-2 py-1 rounded-full whitespace-nowrap ${
-                    a.status === "confirmed"
-                      ? "bg-primary-light text-primary-dark"
-                      : a.status === "cancelled"
-                      ? "bg-red-50 text-red-500"
-                      : a.status === "completed"
-                      ? "bg-primary-light text-primary-dark"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {statusLabel[a.status] ?? a.status}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <form action={updateAppointmentStatus.bind(null, a.id, "confirmed")}>
-                  <button className="text-primary-dark text-sm underline">確認</button>
-                </form>
-                <form action={updateAppointmentStatus.bind(null, a.id, "cancelled")}>
-                  <button className="text-red-500 text-sm underline">取消</button>
-                </form>
-                <Link
-                  href={`/checkout?appointment=${a.id}`}
-                  className="text-sm underline text-primary-dark"
-                >
-                  開單
-                </Link>
-              </div>
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {tabs.map((t) => (
+          <Link
+            key={t.key}
+            href={`/appointments?filter=${t.key}`}
+            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+              activeFilter === t.key
+                ? "bg-primary-dark text-white"
+                : "bg-primary-light text-primary-dark hover:bg-primary/30"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
+      {sortedKeys.length === 0 && (
+        <p className="text-center text-foreground/50 py-12">這個篩選條件下沒有預約</p>
+      )}
+
+      <div className="flex flex-col gap-6">
+        {sortedKeys.map((key) => (
+          <div key={key}>
+            <h2 className="text-sm font-semibold text-foreground/50 mb-2">{dateHeading(key)}</h2>
+            <div className="flex flex-col gap-3">
+              {groups.get(key)!.map((a) => {
+                const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
+                const linked = (a.appointment_services ?? [])
+                  .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
+                  .filter((s): s is ServiceRow => !!s);
+                const single = Array.isArray(a.services) ? a.services[0] : a.services;
+                const services = linked.length > 0 ? linked : single ? [single] : [];
+                const totalPrice = services.reduce((sum, s) => sum + (s.price ?? 0), 0);
+                const maxServiceBuffer = services.reduce(
+                  (max, s) => Math.max(max, s.buffer_minutes ?? 0),
+                  0
+                );
+
+                return (
+                  <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-lg font-bold text-primary-dark">
+                        {new Date(a.start_time).toLocaleTimeString("zh-TW", {
+                          timeZone: "Asia/Taipei",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                          statusStyle[a.status] ?? "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {statusLabel[a.status] ?? a.status}
+                      </span>
+                    </div>
+
+                    <p className="font-semibold mt-1">
+                      {customer?.name}
+                      <span className="font-normal text-xs text-foreground/50 ml-2">
+                        {customer?.phone}
+                      </span>
+                    </p>
+                    <p className="text-sm text-foreground/70">
+                      {services.map((s) => s.name).join("、")}（${totalPrice}）
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      {a.status === "pending" && (
+                        <form action={updateAppointmentStatus.bind(null, a.id, "confirmed")}>
+                          <button className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-primary-dark text-white hover:bg-primary transition-colors">
+                            <Check size={14} /> 確認
+                          </button>
+                        </form>
+                      )}
+                      {a.status !== "cancelled" && a.status !== "completed" && (
+                        <form action={updateAppointmentStatus.bind(null, a.id, "cancelled")}>
+                          <button className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+                            <X size={14} /> 取消
+                          </button>
+                        </form>
+                      )}
+                      <Link
+                        href={`/checkout?appointment=${a.id}`}
+                        className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
+                      >
+                        <ShoppingCart size={14} /> 開單
+                      </Link>
+                    </div>
+
+                    <details className="mt-2 group">
+                      <summary className="text-xs text-foreground/50 cursor-pointer select-none inline-flex items-center gap-1 hover:text-primary-dark">
+                        <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
+                        修改時間／緩衝
+                      </summary>
+                      <form
+                        action={updateAppointmentTime.bind(null, a.id)}
+                        className="flex flex-wrap items-center gap-2 mt-2 pl-4"
+                      >
+                        <input
+                          type="date"
+                          name="date"
+                          defaultValue={toDateInputValue(a.start_time)}
+                          className="border border-primary-light rounded-lg px-2 py-1 text-sm"
+                        />
+                        <input
+                          type="time"
+                          name="time"
+                          defaultValue={toTimeInputValue(a.start_time)}
+                          className="border border-primary-light rounded-lg px-2 py-1 text-sm"
+                        />
+                        <span className="text-xs text-foreground/50 whitespace-nowrap">緩衝</span>
+                        <input
+                          type="number"
+                          name="buffer_hours"
+                          min={0}
+                          defaultValue={Math.floor((a.buffer_minutes ?? maxServiceBuffer) / 60)}
+                          className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
+                        />
+                        <span className="text-xs text-foreground/50">時</span>
+                        <input
+                          type="number"
+                          name="buffer_minutes"
+                          min={0}
+                          max={59}
+                          defaultValue={(a.buffer_minutes ?? maxServiceBuffer) % 60}
+                          className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
+                        />
+                        <span className="text-xs text-foreground/50">分</span>
+                        <button
+                          type="submit"
+                          className="text-primary-dark text-sm underline whitespace-nowrap"
+                        >
+                          更新
+                        </button>
+                      </form>
+                    </details>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-        {appointments?.length === 0 && (
-          <p className="text-center text-foreground/50 py-6">還沒有預約紀錄</p>
-        )}
+          </div>
+        ))}
       </div>
     </main>
   );
