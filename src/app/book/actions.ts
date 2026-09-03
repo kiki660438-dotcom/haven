@@ -142,12 +142,10 @@ export async function getAvailableSlots(serviceIds: string[], date: string, staf
   const dayOpen = new Date(`${date}T${String(OPEN_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
   const dayClose = new Date(`${date}T${String(CLOSE_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
 
+  // 最晚可以「開始」的時間是打烊時間本身（例如6點還能接客），不要求服務要在打烊前做完——
+  // 只要客人是在打烊前上門，做多久都沒關係
   const slots: string[] = [];
-  for (
-    let slotStart = dayOpen;
-    slotStart + durationMs <= dayClose;
-    slotStart += SLOT_STEP_MINUTES * 60_000
-  ) {
+  for (let slotStart = dayOpen; slotStart <= dayClose; slotStart += SLOT_STEP_MINUTES * 60_000) {
     const slotEnd = slotStart + durationMs;
     const freeSomewhere = busyLists.some((busy) => !overlaps(slotStart, slotEnd, busy));
     if (freeSomewhere) {
