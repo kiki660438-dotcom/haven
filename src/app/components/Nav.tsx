@@ -52,10 +52,13 @@ export default function Nav() {
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (isPublic) {
+    const isBook = pathname === "/book" || pathname.startsWith("/book/");
     return (
       <header className="bg-white border-b border-primary-light">
         <div className="max-w-5xl mx-auto px-4 py-3">
-          <span className="font-bold text-primary-dark">Haven 美髮管理</span>
+          <span className="font-bold text-primary-dark">
+            Haven {isBook ? "線上預約" : "美髮管理"}
+          </span>
         </div>
       </header>
     );
