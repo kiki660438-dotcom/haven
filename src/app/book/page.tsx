@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
 import { createBooking, getAvailableSlots, verifyPhone, logoutCustomer } from "./actions";
+import { ChevronDown } from "lucide-react";
 
 function buildQuery(serviceIds: string[], date: string, staffId?: string) {
   const params = new URLSearchParams();
@@ -9,6 +10,21 @@ function buildQuery(serviceIds: string[], date: string, staffId?: string) {
   params.set("date", date ?? "");
   params.set("staff_id", staffId ?? "");
   return params.toString();
+}
+
+type ServiceOption = { id: string; name: string; price: number };
+
+// 服務名稱用「主題-細項」命名（例如「冷塑燙-中髮」），依主題分組；
+// 只有一種選項的（例如「剪髮」）不用分組，直接顯示
+function groupServices(services: ServiceOption[]) {
+  const map = new Map<string, ServiceOption[]>();
+  for (const s of services) {
+    const dashIndex = s.name.indexOf("-");
+    const title = dashIndex === -1 ? s.name : s.name.slice(0, dashIndex);
+    if (!map.has(title)) map.set(title, []);
+    map.get(title)!.push(s);
+  }
+  return [...map.entries()].map(([title, items]) => ({ title, items }));
 }
 
 export default async function BookPage({
@@ -32,6 +48,7 @@ export default async function BookPage({
 
   // 商品券方案（有堂數的服務）只在店內結帳銷售，加上被標記「不開放線上預約」的項目，線上預約選單都不顯示
   const services = allServices?.filter((s) => !s.total_sessions && !s.hide_from_booking);
+  const serviceGroups = groupServices(services ?? []);
 
   const slots =
     serviceIds.length > 0 && date ? await getAvailableSlots(serviceIds, date, staff_id) : null;
@@ -84,21 +101,54 @@ export default async function BookPage({
       >
         <div>
           <p className="text-sm mb-2 text-foreground/60">選擇服務 *（可複選）</p>
-          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto border border-primary-light rounded-lg p-2">
-            {services?.map((s) => (
-              <label
-                key={s.id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light"
-              >
-                <input
-                  type="checkbox"
-                  name="service_id"
-                  value={s.id}
-                  defaultChecked={serviceIds.includes(s.id)}
-                />
-                {s.name}（${s.price}）
-              </label>
-            ))}
+          <div className="flex flex-col gap-1 max-h-80 overflow-y-auto border border-primary-light rounded-lg p-2">
+            {serviceGroups.map((g) => {
+              if (g.items.length === 1) {
+                const s = g.items[0];
+                return (
+                  <label
+                    key={s.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light"
+                  >
+                    <input
+                      type="checkbox"
+                      name="service_id"
+                      value={s.id}
+                      defaultChecked={serviceIds.includes(s.id)}
+                    />
+                    {s.name}（${s.price}）
+                  </label>
+                );
+              }
+              const hasChecked = g.items.some((s) => serviceIds.includes(s.id));
+              return (
+                <details key={g.title} open={hasChecked} className="group">
+                  <summary className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer select-none hover:bg-primary-light">
+                    {g.title}
+                    <ChevronDown
+                      size={14}
+                      className="text-foreground/40 transition-transform group-open:rotate-180"
+                    />
+                  </summary>
+                  <div className="flex flex-col gap-1 pl-4 mt-1">
+                    {g.items.map((s) => (
+                      <label
+                        key={s.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light"
+                      >
+                        <input
+                          type="checkbox"
+                          name="service_id"
+                          value={s.id}
+                          defaultChecked={serviceIds.includes(s.id)}
+                        />
+                        {s.name.slice(g.title.length + 1)}（${s.price}）
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
           </div>
         </div>
         <input
