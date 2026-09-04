@@ -49,6 +49,8 @@ export default async function BookPage({
   // 商品券方案（有堂數的服務）只在店內結帳銷售，加上被標記「不開放線上預約」的項目，線上預約選單都不顯示
   const services = allServices?.filter((s) => !s.total_sessions && !s.hide_from_booking);
   const serviceGroups = groupServices(services ?? []);
+  const singleServiceGroups = serviceGroups.filter((g) => g.items.length === 1);
+  const multiServiceGroups = serviceGroups.filter((g) => g.items.length > 1);
 
   const slots =
     serviceIds.length > 0 && date ? await getAvailableSlots(serviceIds, date, staff_id) : null;
@@ -102,24 +104,29 @@ export default async function BookPage({
         <div>
           <p className="text-sm mb-2 text-foreground/60">選擇服務 *（可複選）</p>
           <div className="flex flex-col gap-1 max-h-80 overflow-y-auto border border-primary-light rounded-lg p-2">
-            {serviceGroups.map((g) => {
-              if (g.items.length === 1) {
-                const s = g.items[0];
-                return (
-                  <label
-                    key={s.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light"
-                  >
-                    <input
-                      type="checkbox"
-                      name="service_id"
-                      value={s.id}
-                      defaultChecked={serviceIds.includes(s.id)}
-                    />
-                    {s.name}（${s.price}）
-                  </label>
-                );
-              }
+            {singleServiceGroups.map((g) => {
+              const s = g.items[0];
+              return (
+                <label
+                  key={s.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light"
+                >
+                  <input
+                    type="checkbox"
+                    name="service_id"
+                    value={s.id}
+                    defaultChecked={serviceIds.includes(s.id)}
+                  />
+                  {s.name}（${s.price}）
+                </label>
+              );
+            })}
+
+            {singleServiceGroups.length > 0 && multiServiceGroups.length > 0 && (
+              <hr className="border-primary-light my-1" />
+            )}
+
+            {multiServiceGroups.map((g) => {
               const hasChecked = g.items.some((s) => serviceIds.includes(s.id));
               return (
                 <details key={g.title} open={hasChecked} className="group">
