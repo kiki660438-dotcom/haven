@@ -48,14 +48,20 @@ export async function updateAppointmentStatus(id: string, status: string) {
   }
 }
 
-export async function updateAppointmentTime(id: string, formData: FormData) {
+export type UpdateTimeState = { ok: boolean; error?: string } | null;
+
+export async function updateAppointmentTime(
+  id: string,
+  _prevState: UpdateTimeState,
+  formData: FormData
+): Promise<UpdateTimeState> {
   const supabase = await createClient();
   const date = formData.get("date") as string;
   const time = formData.get("time") as string;
   const bufferHours = Number(formData.get("buffer_hours")) || 0;
   const bufferMinutesPart = Number(formData.get("buffer_minutes")) || 0;
   const buffer_minutes = bufferHours * 60 + bufferMinutesPart;
-  if (!date || !time) return;
+  if (!date || !time) return { ok: false, error: "請填寫日期與時間" };
 
   const start_time = `${date}T${time}:00+08:00`;
   const { error } = await supabase
@@ -64,8 +70,10 @@ export async function updateAppointmentTime(id: string, formData: FormData) {
     .eq("id", id);
   if (error) {
     console.error("updateAppointmentTime failed", error);
-    throw new Error(`更新失敗：${error.message}`);
+    return { ok: false, error: `更新失敗：${error.message}` };
   }
   revalidatePath("/appointments");
+  revalidatePath("/appointments/calendar");
   revalidatePath("/dashboard");
+  return { ok: true };
 }

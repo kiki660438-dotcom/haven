@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
-import { updateAppointmentStatus, updateAppointmentTime } from "./actions";
+import { updateAppointmentStatus } from "./actions";
+import UpdateTimeForm from "./UpdateTimeForm";
 import { Check, X, ShoppingCart, ChevronDown, Calendar } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -213,47 +214,13 @@ export default async function AppointmentsPage({
                         <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
                         修改時間／緩衝
                       </summary>
-                      <form
-                        action={updateAppointmentTime.bind(null, a.id)}
-                        className="flex flex-wrap items-center gap-2 mt-2 pl-4"
-                      >
-                        <input
-                          type="date"
-                          name="date"
-                          defaultValue={toDateInputValue(a.start_time)}
-                          className="border border-primary-light rounded-lg px-2 py-1 text-sm"
-                        />
-                        <input
-                          type="time"
-                          name="time"
-                          defaultValue={toTimeInputValue(a.start_time)}
-                          className="border border-primary-light rounded-lg px-2 py-1 text-sm"
-                        />
-                        <span className="text-xs text-foreground/50 whitespace-nowrap">緩衝</span>
-                        <input
-                          type="number"
-                          name="buffer_hours"
-                          min={0}
-                          defaultValue={Math.floor((a.buffer_minutes ?? maxServiceBuffer) / 60)}
-                          className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
-                        />
-                        <span className="text-xs text-foreground/50">時</span>
-                        <input
-                          type="number"
-                          name="buffer_minutes"
-                          min={0}
-                          max={59}
-                          defaultValue={(a.buffer_minutes ?? maxServiceBuffer) % 60}
-                          className="w-12 border border-primary-light rounded-lg px-2 py-1 text-sm"
-                        />
-                        <span className="text-xs text-foreground/50">分</span>
-                        <button
-                          type="submit"
-                          className="text-primary-dark text-sm underline whitespace-nowrap"
-                        >
-                          更新
-                        </button>
-                      </form>
+                      <UpdateTimeForm
+                        appointmentId={a.id}
+                        defaultDate={toDateInputValue(a.start_time)}
+                        defaultTime={toTimeInputValue(a.start_time)}
+                        defaultBufferHours={Math.floor((a.buffer_minutes ?? maxServiceBuffer) / 60)}
+                        defaultBufferMinutes={(a.buffer_minutes ?? maxServiceBuffer) % 60}
+                      />
                     </details>
                   </div>
                 );
