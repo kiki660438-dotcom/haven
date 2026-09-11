@@ -24,10 +24,10 @@ export default async function LoginPage({
         className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white"
       >
         <input
-          name="email"
-          type="email"
-          autoComplete="email"
-          placeholder="帳號 (Email)"
+          name="username"
+          type="text"
+          autoComplete="username"
+          placeholder="帳號"
           required
           className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
         />
