@@ -9,6 +9,12 @@ const statusLabel: Record<string, string> = {
   expired: "已過期",
 };
 
+const statusStyle: Record<string, string> = {
+  active: "text-primary-dark",
+  used: "text-red-500",
+  expired: "text-foreground/40",
+};
+
 type Voucher = {
   id: string;
   code: string | null;
@@ -84,7 +90,7 @@ export default function VouchersSearchList({ vouchers }: { vouchers: Voucher[] }
                   {v.expires_at && <> ・ 效期至 {v.expires_at}</>}
                 </p>
               </div>
-              <span className="text-sm text-primary-dark shrink-0">
+              <span className={`text-sm shrink-0 ${statusStyle[v.status] ?? "text-primary-dark"}`}>
                 {statusLabel[v.status] ?? v.status}
               </span>
             </div>
