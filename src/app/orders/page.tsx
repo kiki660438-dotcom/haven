@@ -11,7 +11,9 @@ export default async function OrdersPage({
 
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, total, status, payment_method, customer_name, created_at, customers(name), order_items(service_name, price, quantity)")
+    .select(
+      "id, total, status, payment_method, customer_name, created_at, customers(name), order_items(service_name, price, quantity, unit_cost)"
+    )
     .order("created_at", { ascending: false });
 
   return (
@@ -27,6 +29,11 @@ export default async function OrdersPage({
       <div className="flex flex-col gap-4">
         {orders?.map((o) => {
           const customer = Array.isArray(o.customers) ? o.customers[0] : o.customers;
+          const cost = (o.order_items ?? []).reduce(
+            (sum, it) => sum + (it.unit_cost ?? 0) * it.quantity,
+            0
+          );
+          const margin = o.total - cost;
           return (
             <div
               key={o.id}
@@ -63,7 +70,14 @@ export default async function OrdersPage({
                 ))}
               </ul>
               <div className="flex justify-between items-center">
-                <p className="font-bold">總計 ${o.total}</p>
+                <div>
+                  <p className="font-bold">總計 ${o.total}</p>
+                  {cost > 0 && (
+                    <p className="text-xs text-foreground/50">
+                      材料成本 ${cost.toFixed(1)} ・ 毛利 ${margin.toFixed(1)}
+                    </p>
+                  )}
+                </div>
                 {o.status !== "paid" && (
                   <div className="flex gap-3">
                     <form action={markOrderPaid.bind(null, o.id, "cash")}>

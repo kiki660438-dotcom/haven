@@ -1,12 +1,20 @@
 import { createClient } from "@/lib/supabase-server";
 import { addService, deleteService, updateService } from "./actions";
+import ServiceRecipeEditor from "./ServiceRecipeEditor";
 
 export default async function ServicesPage() {
   const supabase = await createClient();
-  const { data: services } = await supabase
-    .from("services")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const [{ data: services }, { data: products }, { data: recipeRows }] = await Promise.all([
+    supabase.from("services").select("*").order("created_at", { ascending: false }),
+    supabase.from("products").select("id, name, unit, cost_price").order("name"),
+    supabase.from("service_products").select("service_id, product_id, quantity"),
+  ]);
+
+  const recipesByService = new Map<string, { product_id: string; quantity: number }[]>();
+  for (const r of recipeRows ?? []) {
+    if (!recipesByService.has(r.service_id)) recipesByService.set(r.service_id, []);
+    recipesByService.get(r.service_id)!.push({ product_id: r.product_id, quantity: r.quantity });
+  }
 
   return (
     <main className="max-w-3xl mx-auto p-8">
@@ -88,6 +96,11 @@ export default async function ServicesPage() {
                     更新
                   </button>
                 </form>
+                <ServiceRecipeEditor
+                  serviceId={s.id}
+                  initialRecipe={recipesByService.get(s.id) ?? []}
+                  products={products ?? []}
+                />
               </td>
               <td className="px-3">
                 <form action={deleteService.bind(null, s.id)}>

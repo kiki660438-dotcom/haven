@@ -31,6 +31,37 @@ export async function createOrder(formData: FormData) {
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
+  // 依每個服務的「配方」算出這筆訂單實際用掉多少材料成本，並在結帳時扣除對應庫存
+  const { data: recipeRows } = await supabase
+    .from("service_products")
+    .select("service_id, product_id, quantity")
+    .in(
+      "service_id",
+      items.map((i) => i.service_id)
+    );
+
+  const productIds = [...new Set((recipeRows ?? []).map((r) => r.product_id))];
+  const { data: productRows } =
+    productIds.length > 0
+      ? await supabase.from("products").select("id, cost_price, stock_quantity").in("id", productIds)
+      : { data: [] };
+  const productMap = new Map((productRows ?? []).map((p) => [p.id, p]));
+
+  const consumedByProduct = new Map<string, number>();
+  const itemsWithCost = items.map((item) => {
+    const recipe = (recipeRows ?? []).filter((r) => r.service_id === item.service_id);
+    let unit_cost = 0;
+    for (const r of recipe) {
+      const product = productMap.get(r.product_id);
+      unit_cost += r.quantity * (product?.cost_price ?? 0);
+      consumedByProduct.set(
+        r.product_id,
+        (consumedByProduct.get(r.product_id) ?? 0) + r.quantity * item.quantity
+      );
+    }
+    return { ...item, unit_cost };
+  });
+
   const { data: order, error } = await supabase
     .from("orders")
     .insert({ appointment_id, customer_id, customer_name, staff_id, total })
@@ -41,7 +72,17 @@ export async function createOrder(formData: FormData) {
 
   await supabase
     .from("order_items")
-    .insert(items.map((i) => ({ ...i, order_id: order.id })));
+    .insert(itemsWithCost.map((i) => ({ ...i, order_id: order.id })));
+
+  for (const [productId, consumedQty] of consumedByProduct) {
+    const product = productMap.get(productId);
+    if (product) {
+      await supabase
+        .from("products")
+        .update({ stock_quantity: Math.max(0, Math.round(product.stock_quantity - consumedQty)) })
+        .eq("id", productId);
+    }
+  }
 
   // 購買商品券方案（有堂數的服務項目）時，自動建立商品券
   const packageItems = items.filter((i) =>
@@ -78,6 +119,7 @@ export async function createOrder(formData: FormData) {
 
   revalidatePath("/orders");
   revalidatePath("/appointments");
+  revalidatePath("/purchases");
   redirect("/orders?success=1");
 }
 

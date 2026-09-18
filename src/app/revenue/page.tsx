@@ -22,13 +22,15 @@ async function fetchAllOrders(supabase: Awaited<ReturnType<typeof createClient>>
     status: string;
     payment_method: string | null;
     created_at: string;
-    order_items: { service_name: string; price: number; quantity: number }[];
+    order_items: { service_name: string; price: number; quantity: number; unit_cost: number | null }[];
   }[] = [];
 
   while (true) {
     const { data, error } = await supabase
       .from("orders")
-      .select("total, status, payment_method, created_at, order_items(service_name, price, quantity)")
+      .select(
+        "total, status, payment_method, created_at, order_items(service_name, price, quantity, unit_cost)"
+      )
       .range(from, from + pageSize - 1);
 
     if (error || !data || data.length === 0) break;
@@ -54,6 +56,11 @@ export default async function RevenuePage() {
   const monthRevenue = paidOrders
     .filter((o) => o.created_at >= monthStart)
     .reduce((sum, o) => sum + o.total, 0);
+
+  const orderCost = (o: (typeof paidOrders)[number]) =>
+    (o.order_items ?? []).reduce((sum, it) => sum + (it.unit_cost ?? 0) * it.quantity, 0);
+  const totalCost = paidOrders.reduce((sum, o) => sum + orderCost(o), 0);
+  const grossProfit = totalRevenue - totalCost;
 
   const cashRevenue = paidOrders
     .filter((o) => o.payment_method === "cash")
@@ -107,6 +114,19 @@ export default async function RevenuePage() {
           <p className="text-2xl font-bold text-primary-dark">${outstanding}</p>
         </div>
       </div>
+
+      {totalCost > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div className="p-5 rounded-xl border border-primary-light bg-white">
+            <p className="text-sm text-foreground/60 mb-1">累計材料成本</p>
+            <p className="text-xl font-bold text-red-500">${totalCost.toFixed(0)}</p>
+          </div>
+          <div className="p-5 rounded-xl border border-primary-light bg-white">
+            <p className="text-sm text-foreground/60 mb-1">毛利（營業額－材料成本）</p>
+            <p className="text-xl font-bold text-primary-dark">${grossProfit.toFixed(0)}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
         <div className="p-5 rounded-xl border border-primary-light bg-white">

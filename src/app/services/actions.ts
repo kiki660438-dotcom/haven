@@ -32,3 +32,23 @@ export async function updateService(id: string, formData: FormData) {
   revalidatePath("/services");
   revalidatePath("/book");
 }
+
+export async function updateServiceRecipe(serviceId: string, formData: FormData) {
+  const supabase = await createClient();
+  const productIds = formData.getAll("product_id") as string[];
+  const quantities = formData.getAll("quantity") as string[];
+
+  const rows = productIds
+    .map((product_id, i) => ({
+      service_id: serviceId,
+      product_id,
+      quantity: Number(quantities[i]),
+    }))
+    .filter((r) => r.product_id && r.quantity > 0);
+
+  await supabase.from("service_products").delete().eq("service_id", serviceId);
+  if (rows.length > 0) {
+    await supabase.from("service_products").insert(rows);
+  }
+  revalidatePath("/services");
+}
