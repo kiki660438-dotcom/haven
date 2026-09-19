@@ -31,13 +31,20 @@ export async function createOrder(formData: FormData) {
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
+  // 堂數方案（商品券）是預付未來多次使用，購買當下還沒有真正消耗材料——
+  // 材料成本跟庫存要等客人「扣一堂」時才實際發生，見 vouchers/actions.ts 的 useSession()
+  const packageServiceIds = new Set(
+    (services ?? []).filter((s) => s.total_sessions).map((s) => s.id)
+  );
+  const regularItems = items.filter((i) => !packageServiceIds.has(i.service_id));
+
   // 依每個服務的「配方」算出這筆訂單實際用掉多少材料成本，並在結帳時扣除對應庫存
   const { data: recipeRows } = await supabase
     .from("service_products")
     .select("service_id, product_id, quantity")
     .in(
       "service_id",
-      items.map((i) => i.service_id)
+      regularItems.map((i) => i.service_id)
     );
 
   const productIds = [...new Set((recipeRows ?? []).map((r) => r.product_id))];
@@ -48,7 +55,8 @@ export async function createOrder(formData: FormData) {
   const productMap = new Map((productRows ?? []).map((p) => [p.id, p]));
 
   const consumedByProduct = new Map<string, number>();
-  const itemsWithCost = items.map((item) => {
+  const costByServiceId = new Map<string, number>();
+  for (const item of regularItems) {
     const recipe = (recipeRows ?? []).filter((r) => r.service_id === item.service_id);
     let unit_cost = 0;
     for (const r of recipe) {
@@ -59,8 +67,12 @@ export async function createOrder(formData: FormData) {
         (consumedByProduct.get(r.product_id) ?? 0) + r.quantity * item.quantity
       );
     }
-    return { ...item, unit_cost };
-  });
+    costByServiceId.set(item.service_id, unit_cost);
+  }
+  const itemsWithCost = items.map((item) => ({
+    ...item,
+    unit_cost: costByServiceId.get(item.service_id) ?? 0,
+  }));
 
   const { data: order, error } = await supabase
     .from("orders")
