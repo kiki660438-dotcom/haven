@@ -1,7 +1,13 @@
 import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
-import { createBooking, getAvailableSlots, verifyPhone, logoutCustomer } from "./actions";
+import {
+  createBooking,
+  getAvailableSlots,
+  getClosedDateInfo,
+  verifyPhone,
+  logoutCustomer,
+} from "./actions";
 import { ChevronDown } from "lucide-react";
 
 function buildQuery(serviceIds: string[], date: string, staffId?: string) {
@@ -52,8 +58,11 @@ export default async function BookPage({
   const singleServiceGroups = serviceGroups.filter((g) => g.items.length === 1);
   const multiServiceGroups = serviceGroups.filter((g) => g.items.length > 1);
 
+  const closedInfo = date ? await getClosedDateInfo(date) : null;
   const slots =
-    serviceIds.length > 0 && date ? await getAvailableSlots(serviceIds, date, staff_id) : null;
+    serviceIds.length > 0 && date && !closedInfo
+      ? await getAvailableSlots(serviceIds, date, staff_id)
+      : null;
 
   const cookieStore = await cookies();
   const identity = verifyCustomerToken(cookieStore.get(CUSTOMER_COOKIE)?.value);
@@ -93,6 +102,16 @@ export default async function BookPage({
       {error === "line_login" && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
           LINE 登入失敗，請再試一次。
+        </div>
+      )}
+      {error === "closed" && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          抱歉，這天公休，請選擇其他日期。
+        </div>
+      )}
+      {closedInfo && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          這天公休{closedInfo.note ? `（${closedInfo.note}）` : ""}，請選擇其他日期。
         </div>
       )}
 

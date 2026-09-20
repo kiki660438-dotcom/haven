@@ -119,8 +119,16 @@ export async function findAvailableStaff(
   return { ok: false, staffId: null };
 }
 
+export async function getClosedDateInfo(date: string) {
+  const { data } = await supabase.from("closed_dates").select("note").eq("date", date).maybeSingle();
+  return data;
+}
+
 export async function getAvailableSlots(serviceIds: string[], date: string, staffId?: string) {
   if (serviceIds.length === 0) return [];
+
+  const closed = await getClosedDateInfo(date);
+  if (closed) return [];
 
   const { duration, maxBuffer } = await getServicesDuration(serviceIds);
   if (duration === 0) return [];
@@ -229,6 +237,11 @@ export async function createBooking(formData: FormData) {
 
   if (!time) {
     redirect(`/book?${query}&error=no_slot`);
+  }
+
+  const closed = await getClosedDateInfo(date);
+  if (closed) {
+    redirect(`/book?${query}&error=closed`);
   }
 
   const start_time = `${date}T${time}:00+08:00`;
