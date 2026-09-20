@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
-import { Check, X, ShoppingCart, ChevronDown, Calendar } from "lucide-react";
+import { Check, X, ShoppingCart, ChevronDown, Calendar, Plus } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -53,9 +53,9 @@ type ServiceRow = { name: string; price: number; buffer_minutes: number | null }
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; date?: string }>;
+  searchParams: Promise<{ filter?: string; date?: string; success?: string }>;
 }) {
-  const { filter, date } = await searchParams;
+  const { filter, date, success } = await searchParams;
   const activeFilter = date ? "date" : filter ?? "upcoming";
 
   const supabase = await createClient();
@@ -100,13 +100,27 @@ export default async function AppointmentsPage({
     <main className="max-w-3xl mx-auto p-8">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-primary-dark">預約管理</h1>
-        <Link
-          href="/appointments/calendar"
-          className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
-        >
-          <Calendar size={14} /> 月曆檢視
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/appointments/new"
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-primary-dark text-white hover:bg-primary transition-colors"
+          >
+            <Plus size={14} /> 新增預約
+          </Link>
+          <Link
+            href="/appointments/calendar"
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
+          >
+            <Calendar size={14} /> 月曆檢視
+          </Link>
+        </div>
       </div>
+
+      {success && (
+        <div className="mb-4 p-4 rounded-xl bg-primary-light text-primary-dark">
+          預約建立成功！
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6 flex-wrap items-center">
         {tabs.map((t) => (

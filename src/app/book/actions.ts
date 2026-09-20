@@ -32,6 +32,32 @@ export async function getServicesDuration(serviceIds: string[]) {
   return combinedDurationBuffer(data ?? []);
 }
 
+// 請假/排休會擋掉某位設計師（或全門店，staff_id 是 null）在指定日期整天或某個時段的空檔
+async function getLeaveIntervals(date: string, staffId?: string | null): Promise<BusyInterval[]> {
+  let query = supabase
+    .from("staff_leave")
+    .select("all_day, start_time, end_time")
+    .lte("start_date", date)
+    .gte("end_date", date);
+
+  query = staffId ? query.or(`staff_id.eq.${staffId},staff_id.is.null`) : query.is("staff_id", null);
+
+  const { data } = await query;
+
+  return (data ?? []).map((l) => {
+    if (l.all_day || !l.start_time || !l.end_time) {
+      return {
+        start: new Date(`${date}T00:00:00+08:00`).getTime(),
+        end: new Date(`${date}T23:59:59+08:00`).getTime(),
+      };
+    }
+    return {
+      start: new Date(`${date}T${l.start_time}+08:00`).getTime(),
+      end: new Date(`${date}T${l.end_time}+08:00`).getTime(),
+    };
+  });
+}
+
 // 某個時段一旦被預約走，實際佔用的時間＝服務時長＋緩衝時間，這段期間內都不能再被約
 async function getBusyIntervals(
   date: string,
@@ -56,7 +82,7 @@ async function getBusyIntervals(
 
   const { data: appointments } = await query;
 
-  return (appointments ?? [])
+  const appointmentIntervals = (appointments ?? [])
     .filter((a) => a.id !== excludeAppointmentId)
     .map((a) => {
       const linked = (a.appointment_services ?? [])
@@ -80,6 +106,9 @@ async function getBusyIntervals(
       const buffer = a.buffer_minutes ?? serviceBuffer;
       return { start, end: start + (duration + buffer) * 60_000 };
     });
+
+  const leaveIntervals = await getLeaveIntervals(date, staffId);
+  return [...appointmentIntervals, ...leaveIntervals];
 }
 
 function overlaps(startA: number, endA: number, busy: BusyInterval[]) {
@@ -119,15 +148,24 @@ export async function findAvailableStaff(
   return { ok: false, staffId: null };
 }
 
-export async function getClosedDateInfo(date: string) {
-  const { data } = await supabase.from("closed_dates").select("note").eq("date", date).maybeSingle();
-  return data;
+// 全門店整天請假（公休）才回傳資訊，用來在頁面上顯示明確的「公休」訊息；
+// 單一設計師或部分時段的請假只會讓時段選項變少，不會顯示這個訊息
+export async function getFullDayClosureInfo(date: string) {
+  const { data } = await supabase
+    .from("staff_leave")
+    .select("note")
+    .is("staff_id", null)
+    .eq("all_day", true)
+    .lte("start_date", date)
+    .gte("end_date", date)
+    .limit(1);
+  return data?.[0] ?? null;
 }
 
 export async function getAvailableSlots(serviceIds: string[], date: string, staffId?: string) {
   if (serviceIds.length === 0) return [];
 
-  const closed = await getClosedDateInfo(date);
+  const closed = await getFullDayClosureInfo(date);
   if (closed) return [];
 
   const { duration, maxBuffer } = await getServicesDuration(serviceIds);
@@ -239,7 +277,7 @@ export async function createBooking(formData: FormData) {
     redirect(`/book?${query}&error=no_slot`);
   }
 
-  const closed = await getClosedDateInfo(date);
+  const closed = await getFullDayClosureInfo(date);
   if (closed) {
     redirect(`/book?${query}&error=closed`);
   }

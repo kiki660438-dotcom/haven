@@ -36,7 +36,7 @@ const links: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/members", label: "會員消費紀錄", icon: Receipt },
   { href: "/services", label: "服務項目", icon: Scissors },
   { href: "/appointments", label: "預約管理", icon: CalendarCheck },
-  { href: "/closed-dates", label: "公休日設定", icon: CalendarOff },
+  { href: "/staff-leave", label: "請假／排休設定", icon: CalendarOff },
   { href: "/book", label: "線上預約", icon: CalendarPlus },
   { href: "/checkout", label: "開單結帳", icon: ShoppingCart },
   { href: "/orders", label: "訂單紀錄", icon: ClipboardList },
