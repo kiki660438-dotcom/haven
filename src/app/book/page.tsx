@@ -177,13 +177,16 @@ export default async function BookPage({
             })}
           </div>
         </div>
-        <input
-          name="date"
-          type="date"
-          required
-          defaultValue={date ?? ""}
-          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-        />
+        <label className="flex flex-col gap-1 text-sm text-foreground/60">
+          選擇日期 *
+          <input
+            name="date"
+            type="date"
+            required
+            defaultValue={date ?? ""}
+            className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+          />
+        </label>
         <select
           name="staff_id"
           defaultValue={staff_id ?? ""}
