@@ -10,8 +10,13 @@ export async function addStaffLeave(formData: FormData) {
   const start_date = formData.get("start_date") as string;
   const end_date = (formData.get("end_date") as string) || start_date;
   const all_day = formData.get("all_day") === "on";
-  const start_time = all_day ? null : (formData.get("start_time") as string) || null;
-  const end_time = all_day ? null : (formData.get("end_time") as string) || null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const start_time = all_day
+    ? null
+    : `${pad(Number(formData.get("start_hour")) || 0)}:${pad(Number(formData.get("start_minute")) || 0)}`;
+  const end_time = all_day
+    ? null
+    : `${pad(Number(formData.get("end_hour")) || 0)}:${pad(Number(formData.get("end_minute")) || 0)}`;
   const note = (formData.get("note") as string) || null;
 
   if (!start_date) return;

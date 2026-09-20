@@ -65,25 +65,51 @@ export default async function StaffLeavePage() {
           整天（不指定時段就整天請假）
         </label>
 
-        <div className="flex gap-3">
-          <label className="flex-1 flex flex-col gap-1 text-sm text-foreground/60">
-            開始時間（只在非整天時有效）
-            <input
-              name="start_time"
-              type="time"
-              defaultValue="11:00"
-              className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-            />
-          </label>
-          <label className="flex-1 flex flex-col gap-1 text-sm text-foreground/60">
-            結束時間
-            <input
-              name="end_time"
-              type="time"
-              defaultValue="18:00"
-              className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-            />
-          </label>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <p className="text-sm text-foreground/60 mb-1">開始時間（只在非整天時有效，24小時制）</p>
+            <div className="flex items-center gap-1">
+              <input
+                name="start_hour"
+                type="number"
+                min={0}
+                max={23}
+                defaultValue={11}
+                className="w-14 border border-primary-light rounded-lg px-2 py-2 focus:outline-none focus:border-primary"
+              />
+              <span className="text-foreground/50">:</span>
+              <input
+                name="start_minute"
+                type="number"
+                min={0}
+                max={59}
+                defaultValue={0}
+                className="w-14 border border-primary-light rounded-lg px-2 py-2 focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm text-foreground/60 mb-1">結束時間</p>
+            <div className="flex items-center gap-1">
+              <input
+                name="end_hour"
+                type="number"
+                min={0}
+                max={23}
+                defaultValue={18}
+                className="w-14 border border-primary-light rounded-lg px-2 py-2 focus:outline-none focus:border-primary"
+              />
+              <span className="text-foreground/50">:</span>
+              <input
+                name="end_minute"
+                type="number"
+                min={0}
+                max={59}
+                defaultValue={0}
+                className="w-14 border border-primary-light rounded-lg px-2 py-2 focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
         </div>
 
         <label className="flex items-center gap-2 text-sm">
