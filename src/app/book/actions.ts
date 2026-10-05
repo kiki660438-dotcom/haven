@@ -148,6 +148,24 @@ export async function findAvailableStaff(
   return { ok: false, staffId: null };
 }
 
+// 線上預約最多能約到幾天後，店主可在「系統設定」調整，預設 30 天
+export async function getMaxAdvanceBookingDays() {
+  const { data } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "booking_max_advance_days")
+    .maybeSingle();
+  return Number(data?.value) || 30;
+}
+
+export async function getMaxAdvanceBookingDate() {
+  const days = await getMaxAdvanceBookingDays();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+  const [y, m, d] = today.split("-").map(Number);
+  const max = new Date(Date.UTC(y, m - 1, d) + days * 86_400_000);
+  return max.toISOString().slice(0, 10);
+}
+
 // 全門店整天請假（公休）才回傳資訊，用來在頁面上顯示明確的「公休」訊息；
 // 單一設計師或部分時段的請假只會讓時段選項變少，不會顯示這個訊息
 export async function getFullDayClosureInfo(date: string) {
@@ -280,6 +298,11 @@ export async function createBooking(formData: FormData) {
   const closed = await getFullDayClosureInfo(date);
   if (closed) {
     redirect(`/book?${query}&error=closed`);
+  }
+
+  const maxDate = await getMaxAdvanceBookingDate();
+  if (date > maxDate) {
+    redirect(`/book?${query}&error=too_far`);
   }
 
   const start_time = `${date}T${time}:00+08:00`;

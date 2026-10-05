@@ -5,6 +5,7 @@ import {
   createBooking,
   getAvailableSlots,
   getFullDayClosureInfo,
+  getMaxAdvanceBookingDate,
   verifyPhone,
   logoutCustomer,
 } from "./actions";
@@ -58,9 +59,11 @@ export default async function BookPage({
   const singleServiceGroups = serviceGroups.filter((g) => g.items.length === 1);
   const multiServiceGroups = serviceGroups.filter((g) => g.items.length > 1);
 
-  const closedInfo = date ? await getFullDayClosureInfo(date) : null;
+  const maxDate = await getMaxAdvanceBookingDate();
+  const tooFar = !!date && date > maxDate;
+  const closedInfo = date && !tooFar ? await getFullDayClosureInfo(date) : null;
   const slots =
-    serviceIds.length > 0 && date && !closedInfo
+    serviceIds.length > 0 && date && !closedInfo && !tooFar
       ? await getAvailableSlots(serviceIds, date, staff_id)
       : null;
 
@@ -109,9 +112,19 @@ export default async function BookPage({
           抱歉，這天公休，請選擇其他日期。
         </div>
       )}
+      {error === "too_far" && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          抱歉，目前只開放預約到 {maxDate} 之前，請選擇其他日期。
+        </div>
+      )}
       {closedInfo && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
           這天公休{closedInfo.note ? `（${closedInfo.note}）` : ""}，請選擇其他日期。
+        </div>
+      )}
+      {tooFar && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          目前只開放預約到 {maxDate} 之前，請選擇其他日期。
         </div>
       )}
 
@@ -183,6 +196,7 @@ export default async function BookPage({
             name="date"
             type="date"
             required
+            max={maxDate}
             defaultValue={date ?? ""}
             className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
           />

@@ -21,6 +21,7 @@ import {
   TrendingUp,
   UserCog,
   Coins,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -46,6 +47,7 @@ const links: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/revenue", label: "營業額總覽", icon: TrendingUp },
   { href: "/staff", label: "員工資料", icon: UserCog },
   { href: "/payroll", label: "業績薪資", icon: Coins },
+  { href: "/settings", label: "系統設定", icon: Settings },
 ];
 
 export default function Nav() {
