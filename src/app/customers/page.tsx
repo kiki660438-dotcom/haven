@@ -6,8 +6,14 @@ export default async function CustomersPage() {
   const supabase = await createClient();
   const { data: customers } = await supabase
     .from("customers")
-    .select("*")
+    .select("*, orders(status)")
     .order("created_at", { ascending: false });
+
+  const rows =
+    customers?.map((c) => ({
+      ...c,
+      visitCount: c.orders?.filter((o) => o.status === "paid").length ?? 0,
+    })) ?? [];
 
   return (
     <main className="max-w-3xl mx-auto p-8">
@@ -61,7 +67,7 @@ export default async function CustomersPage() {
         </button>
       </form>
 
-      <CustomersSearchTable customers={customers ?? []} />
+      <CustomersSearchTable customers={rows} />
     </main>
   );
 }

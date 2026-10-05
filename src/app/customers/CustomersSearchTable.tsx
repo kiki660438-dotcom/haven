@@ -12,6 +12,7 @@ type Customer = {
   note: string | null;
   birthday: string | null;
   gender: string | null;
+  visitCount: number;
 };
 
 export default function CustomersSearchTable({ customers }: { customers: Customer[] }) {
@@ -45,6 +46,7 @@ export default function CustomersSearchTable({ customers }: { customers: Custome
               <th className="px-3">電話</th>
               <th className="px-3">Email</th>
               <th className="px-3">備註</th>
+              <th className="px-3 text-center">來店次數</th>
               <th className="px-3">生日 / 性別</th>
               <th></th>
             </tr>
@@ -56,6 +58,7 @@ export default function CustomersSearchTable({ customers }: { customers: Custome
                 <td className="px-3">{c.phone}</td>
                 <td className="px-3">{c.email}</td>
                 <td className="px-3">{c.note}</td>
+                <td className="px-3 text-center">{c.visitCount}</td>
                 <td className="px-3">
                   <form
                     action={updateCustomerDemographics.bind(null, c.id)}
@@ -93,7 +96,7 @@ export default function CustomersSearchTable({ customers }: { customers: Custome
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-6 px-3 text-center text-foreground/50">
+                <td colSpan={7} className="py-6 px-3 text-center text-foreground/50">
                   {customers.length === 0 ? "還沒有客戶資料" : "找不到符合的客戶"}
                 </td>
               </tr>
