@@ -46,7 +46,15 @@ export async function POST(request: Request) {
     }
 
     if (event.type === "message" && event.message?.type === "text" && event.replyToken) {
-      const phone = normalizePhone(event.message.text ?? "");
+      const text = event.message.text ?? "";
+
+      if (text === "綁定管理員") {
+        await supabase.rpc("set_owner_line_user_id", { p_line_user_id: userId });
+        await replyLineMessage(event.replyToken, "已設定為管理員通知帳號，之後有新的線上預約會通知您 ✅");
+        continue;
+      }
+
+      const phone = normalizePhone(text);
       if (phone) {
         const { data: linked } = await supabase.rpc("link_line_user_by_phone", {
           p_phone: phone,

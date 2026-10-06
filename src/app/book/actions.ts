@@ -9,6 +9,7 @@ import {
   CUSTOMER_COOKIE_MAX_AGE,
   signCustomerToken,
 } from "@/lib/customer-identity";
+import { pushLineMessage } from "@/lib/line";
 
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 18;
@@ -275,6 +276,36 @@ export async function logoutCustomer(formData: FormData) {
   redirect(returnTo);
 }
 
+// 客人在 LINE 傳「綁定管理員」給 Haven 官方帳號後，webhook 會把她的 line_user_id 存在這裡，
+// 之後線上有新預約進來就會推播通知她，不用一直進後台檢查
+async function notifyOwnerOfNewBooking(customer_id: string, service_ids: string[], start_time: string) {
+  const { data: setting } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "owner_line_user_id")
+    .maybeSingle();
+  if (!setting?.value) return;
+
+  const [{ data: customer }, { data: services }] = await Promise.all([
+    supabase.from("customers").select("name, phone").eq("id", customer_id).maybeSingle(),
+    supabase.from("services").select("name").in("id", service_ids),
+  ]);
+
+  const time = new Date(start_time).toLocaleString("zh-TW", {
+    timeZone: "Asia/Taipei",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const serviceNames = (services ?? []).map((s) => s.name).join("、");
+
+  await pushLineMessage(
+    setting.value,
+    `有新的線上預約！\n${customer?.name ?? ""}（${customer?.phone ?? ""}）\n${time}\n${serviceNames}\n請到後台確認`
+  );
+}
+
 export async function createBooking(formData: FormData) {
   const customer_id = formData.get("customer_id") as string;
   const service_ids = formData.getAll("service_id") as string[];
@@ -338,6 +369,8 @@ export async function createBooking(formData: FormData) {
       .from("appointment_services")
       .insert(service_ids.map((service_id) => ({ appointment_id: appointment.id, service_id })));
   }
+
+  await notifyOwnerOfNewBooking(customer_id, service_ids, start_time);
 
   revalidatePath("/book");
   revalidatePath("/appointments");

@@ -12,7 +12,7 @@ export default async function CustomersPage() {
   const rows =
     customers?.map((c) => ({
       ...c,
-      visitCount: c.orders?.filter((o) => o.status === "paid").length ?? 0,
+      visitCount: c.orders?.filter((o: { status: string }) => o.status === "paid").length ?? 0,
     })) ?? [];
 
   return (
