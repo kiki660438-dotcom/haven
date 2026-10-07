@@ -278,7 +278,12 @@ export async function logoutCustomer(formData: FormData) {
 
 // 客人在 LINE 傳「綁定管理員」給 Haven 官方帳號後，webhook 會把她的 line_user_id 存在這裡，
 // 之後線上有新預約進來就會推播通知她，不用一直進後台檢查
-async function notifyOwnerOfNewBooking(customer_id: string, service_ids: string[], start_time: string) {
+async function notifyOwnerOfNewBooking(
+  customer_id: string,
+  service_ids: string[],
+  start_time: string,
+  note: string | null
+) {
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")
@@ -302,7 +307,9 @@ async function notifyOwnerOfNewBooking(customer_id: string, service_ids: string[
 
   await pushLineMessage(
     setting.value,
-    `有新的線上預約！\n${customer?.name ?? ""}（${customer?.phone ?? ""}）\n${time}\n${serviceNames}\n請到後台確認`
+    `有新的線上預約！\n${customer?.name ?? ""}（${customer?.phone ?? ""}）\n${time}\n${serviceNames}${
+      note ? `\n備註：${note}` : ""
+    }\n請到後台確認`
   );
 }
 
@@ -312,6 +319,7 @@ export async function createBooking(formData: FormData) {
   const date = formData.get("date") as string;
   const time = formData.get("time") as string;
   const requestedStaffId = (formData.get("staff_id") as string) || null;
+  const note = ((formData.get("note") as string) || "").trim() || null;
   const query = `service_id=${service_ids.join(",")}&date=${date}`;
 
   if (!customer_id) {
@@ -356,6 +364,7 @@ export async function createBooking(formData: FormData) {
       status: "pending",
       staff_id: staffId,
       buffer_minutes: maxBuffer,
+      note,
     })
     .select("id")
     .single();
@@ -370,7 +379,7 @@ export async function createBooking(formData: FormData) {
       .insert(service_ids.map((service_id) => ({ appointment_id: appointment.id, service_id })));
   }
 
-  await notifyOwnerOfNewBooking(customer_id, service_ids, start_time);
+  await notifyOwnerOfNewBooking(customer_id, service_ids, start_time, note);
 
   revalidatePath("/book");
   revalidatePath("/appointments");

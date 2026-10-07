@@ -213,6 +213,18 @@ export default async function NewAppointmentPage({
           )}
 
           {slots.length > 0 && (
+            <label className="flex flex-col gap-1 text-sm text-foreground/60">
+              備註（選填）
+              <textarea
+                name="note"
+                rows={3}
+                placeholder="客人需求、想記住的事項都可以寫在這裡"
+                className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
+              />
+            </label>
+          )}
+
+          {slots.length > 0 && (
             <button
               type="submit"
               className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"

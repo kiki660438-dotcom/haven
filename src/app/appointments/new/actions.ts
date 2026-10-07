@@ -15,6 +15,7 @@ export async function createStaffAppointment(formData: FormData) {
   const existingCustomerId = (formData.get("customer_id") as string) || "";
   const newName = ((formData.get("new_customer_name") as string) || "").trim();
   const newPhone = ((formData.get("new_customer_phone") as string) || "").trim();
+  const note = ((formData.get("note") as string) || "").trim() || null;
 
   const query = `service_id=${service_ids.join(",")}&date=${date}&staff_id=${requestedStaffId ?? ""}`;
 
@@ -67,6 +68,7 @@ export async function createStaffAppointment(formData: FormData) {
       status: "confirmed",
       staff_id: staffId,
       buffer_minutes: maxBuffer,
+      note,
     })
     .select("id")
     .single();
