@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { findAvailableStaff, getServicesDuration } from "../../book/actions";
+import { getActiveStaffIds, getServicesDuration } from "../../book/actions";
 
 export async function createStaffAppointment(formData: FormData) {
   const supabase = await createClient();
@@ -50,13 +50,14 @@ export async function createStaffAppointment(formData: FormData) {
   }
 
   const start_time = `${date}T${time}:00+08:00`;
-  const startMs = new Date(start_time).getTime();
-  const { duration, maxBuffer } = await getServicesDuration(service_ids);
-  const durationMs = (duration + maxBuffer) * 60_000;
+  const { maxBuffer } = await getServicesDuration(service_ids);
 
-  const { ok, staffId } = await findAvailableStaff(date, startMs, startMs + durationMs, requestedStaffId);
-  if (!ok) {
-    redirect(`/appointments/new?${query}&error=conflict`);
+  // 後台代客預約是員工自己手動排的，就算時段跟別的預約重疊也讓她排——她通常是評估過覺得
+  // 可以同時服務（例如客人在等染劑上色時排進下一位客人），跟線上預約需要自動擋線不一樣
+  let staffId = requestedStaffId;
+  if (!staffId) {
+    const activeStaffIds = await getActiveStaffIds();
+    staffId = activeStaffIds[0] ?? null;
   }
 
   const { data: appointment, error } = await supabase

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { createStaffAppointment } from "./actions";
-import { getAvailableSlots } from "../../book/actions";
+import { getStaffSlots } from "../../book/actions";
 import CustomerPicker from "../../checkout/CustomerPicker";
 import { ChevronDown } from "lucide-react";
 
@@ -46,7 +46,7 @@ export default async function NewAppointmentPage({
   const multiServiceGroups = serviceGroups.filter((g) => g.items.length > 1);
 
   const slots =
-    serviceIds.length > 0 && date ? await getAvailableSlots(serviceIds, date, staff_id) : null;
+    serviceIds.length > 0 && date ? await getStaffSlots(serviceIds, date, staff_id) : null;
 
   return (
     <main className="max-w-xl mx-auto p-8">
@@ -193,22 +193,26 @@ export default async function NewAppointmentPage({
 
           {slots.length > 0 ? (
             <div>
-              <p className="text-sm text-foreground/60 mb-2">選擇時段 *</p>
+              <p className="text-sm text-foreground/60 mb-2">
+                選擇時段 *（橘框是已經有其他預約的時段，評估可以同時服務的話還是能選）
+              </p>
               <div className="grid grid-cols-4 gap-2">
-                {slots.map((t) => (
+                {slots.map((s) => (
                   <label
-                    key={t}
-                    className="flex items-center justify-center gap-1 border border-primary-light rounded-lg px-2 py-2 text-sm cursor-pointer has-[:checked]:bg-primary-dark has-[:checked]:text-white"
+                    key={s.time}
+                    className={`flex items-center justify-center gap-1 border rounded-lg px-2 py-2 text-sm cursor-pointer has-[:checked]:bg-primary-dark has-[:checked]:text-white ${
+                      s.busy ? "border-orange-300" : "border-primary-light"
+                    }`}
                   >
-                    <input type="radio" name="time" value={t} required className="hidden" />
-                    {t}
+                    <input type="radio" name="time" value={s.time} required className="hidden" />
+                    {s.time}
                   </label>
                 ))}
               </div>
             </div>
           ) : (
             <p className="text-sm text-foreground/50">
-              這天已經沒有空的時段了，請選擇其他日期。
+              請至少選擇一項服務。
             </p>
           )}
 

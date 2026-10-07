@@ -116,7 +116,7 @@ function overlaps(startA: number, endA: number, busy: BusyInterval[]) {
   return busy.some((b) => startA < b.end && endA > b.start);
 }
 
-async function getActiveStaffIds(): Promise<string[]> {
+export async function getActiveStaffIds(): Promise<string[]> {
   const { data } = await supabase.from("staff").select("id").eq("active", true);
   return data?.map((s) => s.id) ?? [];
 }
@@ -219,6 +219,33 @@ export async function getAvailableSlots(serviceIds: string[], date: string, staf
       const mm = String(d.getUTCMinutes()).padStart(2, "0");
       slots.push(`${hh}:${mm}`);
     }
+  }
+
+  return slots;
+}
+
+// 後台代客預約給員工自己用的，跟線上預約不一樣：員工可能評估過，知道緩衝時段裡其實可以同時
+// 排進別的客人（例如客人在等染劑上色時，順手幫下一位客人剪髮），所以這裡「全部時段都顯示」，
+// 只標記哪些已經有預約（busy），不像 getAvailableSlots 那樣直接把它們濾掉
+export async function getStaffSlots(serviceIds: string[], date: string, staffId?: string) {
+  if (serviceIds.length === 0) return [];
+
+  const { duration, maxBuffer } = await getServicesDuration(serviceIds);
+  if (duration === 0) return [];
+
+  const durationMs = (duration + maxBuffer) * 60_000;
+  const busy = await getBusyIntervals(date, staffId || null);
+
+  const dayOpen = new Date(`${date}T${String(OPEN_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
+  const dayClose = new Date(`${date}T${String(CLOSE_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
+
+  const slots: { time: string; busy: boolean }[] = [];
+  for (let slotStart = dayOpen; slotStart <= dayClose; slotStart += SLOT_STEP_MINUTES * 60_000) {
+    const slotEnd = slotStart + durationMs;
+    const d = new Date(slotStart);
+    const hh = String((d.getUTCHours() + 8) % 24).padStart(2, "0");
+    const mm = String(d.getUTCMinutes()).padStart(2, "0");
+    slots.push({ time: `${hh}:${mm}`, busy: overlaps(slotStart, slotEnd, busy) });
   }
 
   return slots;
