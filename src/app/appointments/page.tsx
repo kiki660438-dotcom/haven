@@ -62,7 +62,7 @@ export default async function AppointmentsPage({
   const { data: appointments } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, buffer_minutes, customers(name, phone), staff(name), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
+      "id, start_time, status, buffer_minutes, note, customers(name, phone), staff(name), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
     )
     .order("start_time", { ascending: true });
 
@@ -199,6 +199,9 @@ export default async function AppointmentsPage({
                     <p className="text-sm text-foreground/70">
                       {services.map((s) => s.name).join("、")}（${totalPrice}）
                     </p>
+                    {a.note && (
+                      <p className="text-xs text-foreground/50 mt-1">備註：{a.note}</p>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-2 mt-3">
                       {a.status === "pending" && (
