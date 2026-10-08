@@ -82,7 +82,10 @@ async function getBusyIntervals(
     query = query.eq("staff_id", staffId);
   }
 
-  const { data: appointments } = await query;
+  const [{ data: appointments }, leaveIntervals] = await Promise.all([
+    query,
+    getLeaveIntervals(date, staffId),
+  ]);
 
   const appointmentIntervals = (appointments ?? [])
     .filter((a) => a.id !== excludeAppointmentId)
@@ -109,7 +112,6 @@ async function getBusyIntervals(
       return { start, end: start + (duration + buffer) * 60_000 };
     });
 
-  const leaveIntervals = await getLeaveIntervals(date, staffId);
   return [...appointmentIntervals, ...leaveIntervals];
 }
 
@@ -185,10 +187,13 @@ export async function getFullDayClosureInfo(date: string) {
 export async function getAvailableSlots(serviceIds: string[], date: string, staffId?: string) {
   if (serviceIds.length === 0) return [];
 
-  const closed = await getFullDayClosureInfo(date);
+  // 這三個查詢互不依賴，平行查比一個一個等快很多
+  const [closed, { duration, maxBuffer }, activeStaffIds] = await Promise.all([
+    getFullDayClosureInfo(date),
+    getServicesDuration(serviceIds),
+    staffId ? Promise.resolve([]) : getActiveStaffIds(),
+  ]);
   if (closed) return [];
-
-  const { duration, maxBuffer } = await getServicesDuration(serviceIds);
   if (duration === 0) return [];
 
   const durationMs = (duration + maxBuffer) * 60_000;
@@ -196,13 +201,10 @@ export async function getAvailableSlots(serviceIds: string[], date: string, staf
   let busyLists: BusyInterval[][];
   if (staffId) {
     busyLists = [await getBusyIntervals(date, staffId)];
+  } else if (activeStaffIds.length > 0) {
+    busyLists = await Promise.all(activeStaffIds.map((id) => getBusyIntervals(date, id)));
   } else {
-    const activeStaffIds = await getActiveStaffIds();
-    if (activeStaffIds.length > 0) {
-      busyLists = await Promise.all(activeStaffIds.map((id) => getBusyIntervals(date, id)));
-    } else {
-      busyLists = [await getBusyIntervals(date, null)];
-    }
+    busyLists = [await getBusyIntervals(date, null)];
   }
 
   const dayOpen = new Date(`${date}T${String(OPEN_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
@@ -363,20 +365,23 @@ export async function createBooking(formData: FormData) {
     redirect(`/book?${query}&error=no_slot`);
   }
 
-  const closed = await getFullDayClosureInfo(date);
+  // 這三個查詢互不依賴，平行查比一個一個等快很多
+  const [closed, maxDate, { duration, maxBuffer }] = await Promise.all([
+    getFullDayClosureInfo(date),
+    getMaxAdvanceBookingDate(),
+    getServicesDuration(service_ids),
+  ]);
+
   if (closed) {
     redirect(`/book?${query}&error=closed`);
   }
 
-  const maxDate = await getMaxAdvanceBookingDate();
   if (date > maxDate) {
     redirect(`/book?${query}&error=too_far`);
   }
 
   const start_time = `${date}T${time}:00+08:00`;
   const startMs = new Date(start_time).getTime();
-
-  const { duration, maxBuffer } = await getServicesDuration(service_ids);
   const durationMs = (duration + maxBuffer) * 60_000;
 
   const { ok, staffId } = await findAvailableStaff(date, startMs, startMs + durationMs, requestedStaffId);

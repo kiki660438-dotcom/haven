@@ -48,7 +48,12 @@ export default async function BookPage({
   const { success, error, service_id, date, staff_id } = await searchParams;
   const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
 
-  const { data: allServices } = await supabase.from("services").select("*").order("name");
+  // 這三個查詢互不依賴，平行查比一個一個等快很多
+  const [{ data: allServices }, maxDate, rawClosedInfo] = await Promise.all([
+    supabase.from("services").select("*").order("name"),
+    getMaxAdvanceBookingDate(),
+    date ? getFullDayClosureInfo(date) : Promise.resolve(null),
+  ]);
 
   // 商品券方案（有堂數的服務）只在店內結帳銷售，加上被標記「不開放線上預約」的項目，線上預約選單都不顯示
   const services = allServices?.filter((s) => !s.total_sessions && !s.hide_from_booking);
@@ -56,9 +61,8 @@ export default async function BookPage({
   const singleServiceGroups = serviceGroups.filter((g) => g.items.length === 1);
   const multiServiceGroups = serviceGroups.filter((g) => g.items.length > 1);
 
-  const maxDate = await getMaxAdvanceBookingDate();
   const tooFar = !!date && date > maxDate;
-  const closedInfo = date && !tooFar ? await getFullDayClosureInfo(date) : null;
+  const closedInfo = tooFar ? null : rawClosedInfo;
   const slots =
     serviceIds.length > 0 && date && !closedInfo && !tooFar
       ? await getAvailableSlots(serviceIds, date, staff_id)
