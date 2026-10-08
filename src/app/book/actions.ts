@@ -318,10 +318,11 @@ async function notifyOwnerOfNewBooking(
     .maybeSingle();
   if (!setting?.value) return;
 
-  const [{ data: customer }, { data: services }] = await Promise.all([
-    supabase.from("customers").select("name, phone").eq("id", customer_id).maybeSingle(),
+  const [{ data: customerRows }, { data: services }] = await Promise.all([
+    supabase.rpc("get_customer_name_phone", { p_customer_id: customer_id }),
     supabase.from("services").select("name").in("id", service_ids),
   ]);
+  const customer = customerRows?.[0];
 
   const time = new Date(start_time).toLocaleString("zh-TW", {
     timeZone: "Asia/Taipei",
