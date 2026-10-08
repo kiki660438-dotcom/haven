@@ -48,10 +48,7 @@ export default async function BookPage({
   const { success, error, service_id, date, staff_id } = await searchParams;
   const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
 
-  const [{ data: allServices }, { data: staffList }] = await Promise.all([
-    supabase.from("services").select("*").order("name"),
-    supabase.from("staff").select("id, name").eq("active", true).order("name"),
-  ]);
+  const { data: allServices } = await supabase.from("services").select("*").order("name");
 
   // 商品券方案（有堂數的服務）只在店內結帳銷售，加上被標記「不開放線上預約」的項目，線上預約選單都不顯示
   const services = allServices?.filter((s) => !s.total_sessions && !s.hide_from_booking);
@@ -206,18 +203,6 @@ export default async function BookPage({
             className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
           />
         </label>
-        <select
-          name="staff_id"
-          defaultValue={staff_id ?? ""}
-          className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-        >
-          <option value="">指定設計師（選填，不指定則自動安排）</option>
-          {staffList?.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
         <button
           type="submit"
           className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"

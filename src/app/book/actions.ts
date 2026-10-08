@@ -3,6 +3,7 @@
 import { supabase } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cookies } from "next/headers";
 import {
   CUSTOMER_COOKIE,
@@ -407,7 +408,9 @@ export async function createBooking(formData: FormData) {
       .insert(service_ids.map((service_id) => ({ appointment_id: appointment.id, service_id })));
   }
 
-  await notifyOwnerOfNewBooking(customer_id, service_ids, start_time, note);
+  // 推播通知給妳這個動作會呼叫 LINE 的 API，網路慢的時候客人送出預約會卡在等這個跑完才能跳轉——
+  // 用 after() 讓它在回應送出之後才在背景執行，不要讓客人等
+  after(() => notifyOwnerOfNewBooking(customer_id, service_ids, start_time, note));
 
   revalidatePath("/book");
   revalidatePath("/appointments");
