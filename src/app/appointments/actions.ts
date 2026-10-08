@@ -40,7 +40,7 @@ export async function updateAppointmentStatus(id: string, status: string) {
 
       await pushLineMessage(
         customer.line_user_id,
-        `親愛的 ${customer?.name ?? ""} 客人您好，\n設計師 ${staffName} 已經接受您的預約了喔！\n門店：Haven Hair[Haven Hair 中途髮廊]\n預約時間：${dateTime}\n\n服務人員\n${staffName}`
+        `親愛的 ${customer?.name ?? ""} 客人您好，\n設計師 ${staffName} 已經接受您的預約了喔！\n門店：Haven Hair\n預約時間：${dateTime}\n\n服務人員\n${staffName}`
       );
     }
 
