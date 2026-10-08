@@ -37,9 +37,7 @@ export async function updateAppointmentStatus(id: string, status: string) {
       const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
       const dateTime = `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
       const staffName = staff?.name ?? "KIKI";
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        "新竹市東區北大路92巷40弄1號1樓"
-      )}`;
+      const mapsUrl = "https://share.google/RLP2DbvbZF8pMIvmA";
 
       await pushLineMessage(
         customer.line_user_id,
