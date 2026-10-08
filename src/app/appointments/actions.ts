@@ -15,26 +15,32 @@ export async function updateAppointmentStatus(id: string, status: string) {
   if (status === "confirmed") {
     const { data: appointment } = await supabase
       .from("appointments")
-      .select("start_time, customers(line_user_id), services(name), appointment_services(services(name))")
+      .select("start_time, customers(line_user_id, name), staff(name)")
       .eq("id", id)
       .single();
 
     const customer = Array.isArray(appointment?.customers)
       ? appointment.customers[0]
       : appointment?.customers;
-    const linked = (appointment?.appointment_services ?? [])
-      .map((row) => (Array.isArray(row.services) ? row.services[0] : row.services))
-      .filter((s): s is { name: string } => !!s);
-    const single = Array.isArray(appointment?.services) ? appointment.services[0] : appointment?.services;
-    const serviceNames = linked.length > 0 ? linked.map((s) => s.name) : single ? [single.name] : [];
+    const staff = Array.isArray(appointment?.staff) ? appointment.staff[0] : appointment?.staff;
 
     if (customer?.line_user_id && appointment) {
-      const time = new Date(appointment.start_time).toLocaleString("zh-TW", {
+      const parts = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Taipei",
-      });
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(new Date(appointment.start_time));
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+      const dateTime = `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
+      const staffName = staff?.name ?? "KIKI";
+
       await pushLineMessage(
         customer.line_user_id,
-        `您的預約已確認 ✅\n服務項目：${serviceNames.join("、")}\n時間：${time}\n期待您的光臨！`
+        `親愛的 ${customer?.name ?? ""} 客人您好，\n設計師 ${staffName} 已經接受您的預約了喔！\n門店：Haven Hair[Haven Hair 中途髮廊]\n預約時間：${dateTime}\n\n服務人員\n${staffName}`
       );
     }
 
