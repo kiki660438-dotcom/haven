@@ -82,11 +82,16 @@ export default async function BookPage({
         </a>
       </div>
 
-      {success && (
-        <div className="mb-6 p-4 rounded-xl bg-primary-light text-primary-dark">
-          預約已送出！我們會盡快與您確認 🎉
+      {success ? (
+        <div className="p-6 rounded-xl bg-primary-light text-primary-dark text-center">
+          <p className="text-lg font-semibold mb-2">預約已送出 🎉</p>
+          <p className="text-sm">我們會盡快與您確認，請耐心等候設計師確認通知。</p>
+          <a href="/my" className="inline-block mt-4 text-sm underline">
+            查看我的預約／商品券
+          </a>
         </div>
-      )}
+      ) : (
+      <>
       {error === "conflict" && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
           抱歉，這個時段剛剛被其他客人預約走了，請重新選擇時段。
@@ -355,6 +360,8 @@ export default async function BookPage({
             </button>
           )}
         </form>
+      )}
+      </>
       )}
     </main>
   );
