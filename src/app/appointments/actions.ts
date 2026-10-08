@@ -37,7 +37,7 @@ export async function updateAppointmentStatus(id: string, status: string) {
       const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
       const dateTime = `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
       const staffName = staff?.name ?? "KIKI";
-      const mapsUrl = "https://share.google/RLP2DbvbZF8pMIvmA";
+      const mapsUrl = "https://maps.app.goo.gl/rkyQPMQHHDYaGvRr5";
 
       await pushLineMessage(
         customer.line_user_id,
