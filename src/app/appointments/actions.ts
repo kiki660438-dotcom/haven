@@ -37,10 +37,13 @@ export async function updateAppointmentStatus(id: string, status: string) {
       const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
       const dateTime = `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
       const staffName = staff?.name ?? "KIKI";
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        "新竹市東區北大路92巷40弄1號1樓"
+      )}`;
 
       await pushLineMessage(
         customer.line_user_id,
-        `親愛的 ${customer?.name ?? ""} 客人您好，\n設計師 ${staffName} 已經接受您的預約了喔！\n門店：Haven Hair\n預約時間：${dateTime}\n\n服務人員\n${staffName}`
+        `親愛的 ${customer?.name ?? ""} 客人您好，\n設計師 ${staffName} 已經接受您的預約了喔！\n門店：Haven Hair\n預約時間：${dateTime}\n地址：${mapsUrl}\n\n服務人員\n${staffName}`
       );
     }
 
