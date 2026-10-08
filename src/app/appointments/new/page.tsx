@@ -217,6 +217,33 @@ export default async function NewAppointmentPage({
           )}
 
           {slots.length > 0 && (
+            <div>
+              <p className="text-sm mb-1 text-foreground/60">
+                緩衝時間（選填，服務結束後這段時間內不開放其他人預約）
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  name="buffer_hours"
+                  min={0}
+                  defaultValue={0}
+                  className="w-16 border border-primary-light rounded-lg px-2 py-1 text-sm"
+                />
+                <span className="text-sm text-foreground/50">時</span>
+                <input
+                  type="number"
+                  name="buffer_minutes"
+                  min={0}
+                  max={59}
+                  defaultValue={0}
+                  className="w-16 border border-primary-light rounded-lg px-2 py-1 text-sm"
+                />
+                <span className="text-sm text-foreground/50">分</span>
+              </div>
+            </div>
+          )}
+
+          {slots.length > 0 && (
             <label className="flex flex-col gap-1 text-sm text-foreground/60">
               備註（選填）
               <textarea

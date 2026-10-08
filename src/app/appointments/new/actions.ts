@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getActiveStaffIds, getServicesDuration } from "../../book/actions";
+import { getActiveStaffIds } from "../../book/actions";
 
 export async function createStaffAppointment(formData: FormData) {
   const supabase = await createClient();
@@ -16,6 +16,9 @@ export async function createStaffAppointment(formData: FormData) {
   const newName = ((formData.get("new_customer_name") as string) || "").trim();
   const newPhone = ((formData.get("new_customer_phone") as string) || "").trim();
   const note = ((formData.get("note") as string) || "").trim() || null;
+  const bufferHours = Number(formData.get("buffer_hours")) || 0;
+  const bufferMinutesPart = Number(formData.get("buffer_minutes")) || 0;
+  const buffer_minutes = bufferHours * 60 + bufferMinutesPart;
 
   const query = `service_id=${service_ids.join(",")}&date=${date}&staff_id=${requestedStaffId ?? ""}`;
 
@@ -50,7 +53,6 @@ export async function createStaffAppointment(formData: FormData) {
   }
 
   const start_time = `${date}T${time}:00+08:00`;
-  const { maxBuffer } = await getServicesDuration(service_ids);
 
   // 後台代客預約是員工自己手動排的，就算時段跟別的預約重疊也讓她排——她通常是評估過覺得
   // 可以同時服務（例如客人在等染劑上色時排進下一位客人），跟線上預約需要自動擋線不一樣
@@ -68,7 +70,7 @@ export async function createStaffAppointment(formData: FormData) {
       start_time,
       status: "confirmed",
       staff_id: staffId,
-      buffer_minutes: maxBuffer,
+      buffer_minutes,
       note,
     })
     .select("id")
