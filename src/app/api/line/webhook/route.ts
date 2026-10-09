@@ -60,12 +60,18 @@ export async function POST(request: Request) {
           p_phone: phone,
           p_line_user_id: userId,
         });
-        await replyLineMessage(
-          event.replyToken,
-          linked
-            ? "綁定成功！之後預約確認會透過 LINE 通知您 🎉"
-            : "找不到這個手機號碼對應的會員資料，請確認號碼是否正確，或先到店家完成第一次預約登記。"
-        );
+
+        if (!linked) {
+          // 這支電話號碼還不是 Haven 的客戶——與其回覆「找不到」讓客人卡住，
+          // 直接幫他建立一筆新客戶資料並綁定，跟線上預約的電話驗證邏輯一致
+          const profileRes = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+            headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+          });
+          const displayName = profileRes.ok ? (await profileRes.json()).displayName : "LINE好友";
+          await supabase.from("customers").insert({ name: displayName, phone, line_user_id: userId });
+        }
+
+        await replyLineMessage(event.replyToken, "綁定成功！之後預約確認會透過 LINE 通知您 🎉");
       }
     }
   }
