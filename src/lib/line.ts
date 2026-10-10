@@ -20,7 +20,7 @@ export async function pushLineMessage(lineUserId: string, text: string) {
 }
 
 export async function replyLineMessage(replyToken: string, text: string) {
-  await fetch(`${LINE_API}/reply`, {
+  const res = await fetch(`${LINE_API}/reply`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -31,4 +31,7 @@ export async function replyLineMessage(replyToken: string, text: string) {
       messages: [{ type: "text", text }],
     }),
   });
+  if (!res.ok) {
+    console.error("replyLineMessage failed", res.status, await res.text().catch(() => ""));
+  }
 }
