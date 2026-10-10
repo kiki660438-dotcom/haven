@@ -72,7 +72,15 @@ export async function POST(request: Request) {
         }
 
         await replyLineMessage(event.replyToken, "綁定成功！之後預約確認會透過 LINE 通知您 🎉");
+        continue;
       }
+
+      // 不是指令、也不是電話號碼——順勢提醒對方綁定，用「回覆」不是「推播」所以不會占用訊息額度，
+      // 剛好可以拿來觸及舊好友（他們本來就不會再收到 follow 事件的歡迎訊息）
+      await replyLineMessage(
+        event.replyToken,
+        "哈囉！歡迎光臨 Haven Hair 中途髮廊～目前預約系統正在轉換期，麻煩回覆您的手機號碼（例如 0912345678），幫您綁定帳號，之後預約狀態都會透過這裡通知您喔！"
+      );
     }
   }
 
