@@ -66,6 +66,12 @@ async function processEvent(event: LineEvent) {
       return;
     }
 
+    // 已經綁定過的客人就不要再提醒了，只對還沒綁定的人回覆
+    const { data: boundCustomerId } = await supabase.rpc("find_customer_id_by_line_user_id", {
+      p_line_user_id: userId,
+    });
+    if (boundCustomerId) return;
+
     // 不是指令、也不是電話號碼——順勢提醒對方綁定，用「回覆」不是「推播」所以不會占用訊息額度，
     // 剛好可以拿來觸及舊好友（他們本來就不會再收到 follow 事件的歡迎訊息）
     await replyLineMessage(
