@@ -16,6 +16,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Haven 美髮管理",
   description: "美髮業客戶與預約管理系統",
+  icons: {
+    icon: [{ url: "/icons/favicon-64.png", sizes: "64x64", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Haven",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({
