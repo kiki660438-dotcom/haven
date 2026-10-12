@@ -4,6 +4,8 @@ import { createStaffAppointment } from "./actions";
 import { getStaffSlots } from "../../book/actions";
 import CustomerPicker from "../../checkout/CustomerPicker";
 import { ChevronDown } from "lucide-react";
+import TimeSlotOption from "../../components/TimeSlotOption";
+import SubmitButton from "../../components/SubmitButton";
 
 type ServiceOption = { id: string; name: string; price: number };
 
@@ -198,15 +200,7 @@ export default async function NewAppointmentPage({
               </p>
               <div className="grid grid-cols-4 gap-2">
                 {slots.map((s) => (
-                  <label
-                    key={s.time}
-                    className={`flex items-center justify-center gap-1 border rounded-lg px-2 py-2 text-sm cursor-pointer has-[:checked]:bg-primary-dark has-[:checked]:text-white ${
-                      s.busy ? "border-orange-300" : "border-primary-light"
-                    }`}
-                  >
-                    <input type="radio" name="time" value={s.time} required className="hidden" />
-                    {s.time}
-                  </label>
+                  <TimeSlotOption key={s.time} time={s.time} busy={s.busy} />
                 ))}
               </div>
             </div>
@@ -255,14 +249,7 @@ export default async function NewAppointmentPage({
             </label>
           )}
 
-          {slots.length > 0 && (
-            <button
-              type="submit"
-              className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
-            >
-              建立預約
-            </button>
-          )}
+          {slots.length > 0 && <SubmitButton pendingText="建立中…">建立預約</SubmitButton>}
         </form>
       )}
     </main>

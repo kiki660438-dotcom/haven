@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabase";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
 import { verifyPhone, logoutCustomer, getAvailableSlots } from "../book/actions";
 import { cancelMyAppointment, rescheduleMyAppointment } from "./actions";
+import TimeSlotOption from "../components/TimeSlotOption";
+import SubmitButton from "../components/SubmitButton";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -71,12 +73,7 @@ export default async function MyPage({
               required
               className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
             />
-            <button
-              type="submit"
-              className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
-            >
-              電話登入
-            </button>
+            <SubmitButton pendingText="登入中…">電話登入</SubmitButton>
           </form>
 
           <a href={lineLoginUrl} className="text-center text-sm underline text-primary-dark">
@@ -178,9 +175,12 @@ export default async function MyPage({
                     {isRescheduling ? "取消改期" : "改期"}
                   </a>
                   <form action={cancelMyAppointment.bind(null, a.id)}>
-                    <button type="submit" className="text-red-500 text-sm whitespace-nowrap">
+                    <SubmitButton
+                      pendingText="取消中…"
+                      className="text-red-500 text-sm whitespace-nowrap"
+                    >
                       取消預約
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               </div>
@@ -210,25 +210,14 @@ export default async function MyPage({
                       {rescheduleSlots.length > 0 ? (
                         <div className="grid grid-cols-4 gap-2">
                           {rescheduleSlots.map((t) => (
-                            <label
-                              key={t}
-                              className="flex items-center justify-center gap-1 border border-primary-light rounded-lg px-2 py-2 text-sm cursor-pointer has-[:checked]:bg-primary-dark has-[:checked]:text-white"
-                            >
-                              <input type="radio" name="time" value={t} required className="hidden" />
-                              {t}
-                            </label>
+                            <TimeSlotOption key={t} time={t} />
                           ))}
                         </div>
                       ) : (
                         <p className="text-sm text-foreground/50">這天沒有空的時段，請選擇其他日期。</p>
                       )}
                       {rescheduleSlots.length > 0 && (
-                        <button
-                          type="submit"
-                          className="bg-primary-dark text-white rounded-lg px-4 py-2 text-sm hover:bg-primary transition-colors"
-                        >
-                          確認改期
-                        </button>
+                        <SubmitButton pendingText="改期中…">確認改期</SubmitButton>
                       )}
                     </form>
                   )}

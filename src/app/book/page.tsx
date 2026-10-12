@@ -10,6 +10,9 @@ import {
   logoutCustomer,
 } from "./actions";
 import { ChevronDown } from "lucide-react";
+import TimeSlotOption from "../components/TimeSlotOption";
+import SubmitButton from "../components/SubmitButton";
+import PendingGetForm from "../components/PendingGetForm";
 
 function buildQuery(serviceIds: string[], date: string, staffId?: string) {
   const params = new URLSearchParams();
@@ -134,9 +137,10 @@ export default async function BookPage({
         </div>
       )}
 
-      <form
-        method="GET"
+      <PendingGetForm
         action="/book"
+        label="查詢可預約時段"
+        pendingLabel="查詢中…"
         className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white mb-6"
       >
         <div>
@@ -207,13 +211,7 @@ export default async function BookPage({
             className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
           />
         </label>
-        <button
-          type="submit"
-          className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
-        >
-          查詢可預約時段
-        </button>
-      </form>
+      </PendingGetForm>
 
       {slots && !identity && (
         <div className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white">
@@ -262,12 +260,7 @@ export default async function BookPage({
                 </select>
               </label>
             </div>
-            <button
-              type="submit"
-              className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
-            >
-              電話登入
-            </button>
+            <SubmitButton pendingText="登入中…">電話登入</SubmitButton>
           </form>
 
           <a
@@ -312,13 +305,7 @@ export default async function BookPage({
               <p className="text-sm text-foreground/60 mb-2">選擇可預約時段 *</p>
               <div className="grid grid-cols-4 gap-2">
                 {slots.map((t) => (
-                  <label
-                    key={t}
-                    className="flex items-center justify-center gap-1 border border-primary-light rounded-lg px-2 py-2 text-sm cursor-pointer has-[:checked]:bg-primary-dark has-[:checked]:text-white"
-                  >
-                    <input type="radio" name="time" value={t} required className="hidden" />
-                    {t}
-                  </label>
+                  <TimeSlotOption key={t} time={t} />
                 ))}
               </div>
             </div>
@@ -340,14 +327,7 @@ export default async function BookPage({
             </label>
           )}
 
-          {slots.length > 0 && (
-            <button
-              type="submit"
-              className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
-            >
-              送出預約
-            </button>
-          )}
+          {slots.length > 0 && <SubmitButton pendingText="送出中…">送出預約</SubmitButton>}
         </form>
       )}
       </>
