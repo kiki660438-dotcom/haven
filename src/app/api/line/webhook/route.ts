@@ -78,7 +78,7 @@ async function processEvent(event: LineEvent) {
     if (digitCount >= 6 && /^[\d\s\-+()]+$/.test(text.trim())) {
       await replyLineMessage(
         event.replyToken,
-        `您輸入的號碼是 ${digitCount} 碼，台灣手機號碼需要 10 碼且 09 開頭（例如 0912345678），麻煩再確認一下後重新輸入～`
+        "電話號碼錯誤，請重新輸入一次（需為 10 碼、09 開頭，例如 0912345678）"
       );
       return;
     }
