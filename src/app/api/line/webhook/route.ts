@@ -47,6 +47,14 @@ async function processEvent(event: LineEvent) {
 
     const phone = normalizePhone(text);
     if (phone) {
+      const { data: alreadyBoundId } = await supabase.rpc("find_customer_id_by_line_user_id", {
+        p_line_user_id: userId,
+      });
+      if (alreadyBoundId) {
+        await replyLineMessage(event.replyToken, "您之前已經綁定成功囉，不需要再綁定，預約通知都會透過這裡傳給您 ✅");
+        return;
+      }
+
       const { data: linked } = await supabase.rpc("link_line_user_by_phone", {
         p_phone: phone,
         p_line_user_id: userId,
