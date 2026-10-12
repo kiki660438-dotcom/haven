@@ -66,14 +66,9 @@ async function processEvent(event: LineEvent) {
       return;
     }
 
-    // 已經綁定過的客人就不要再提醒了，只對還沒綁定的人回覆
-    const { data: boundCustomerId } = await supabase.rpc("find_customer_id_by_line_user_id", {
-      p_line_user_id: userId,
-    });
-    if (boundCustomerId) return;
-
     // 看起來是在輸入電話（幾乎都是數字）但位數或開頭不對，直接告訴他哪裡錯，
-    // 不然他只會再收到同一句「請回覆手機號碼」，不知道是自己少打了一碼
+    // 不然他只會再收到同一句「請回覆手機號碼」，不知道是自己少打了一碼。
+    // 這個要放在「是否已綁定」的判斷之前：已綁定的人想改綁別支號碼打錯時也需要得到回覆
     const digitCount = text.replace(/[^0-9]/g, "").length;
     if (digitCount >= 6 && /^[\d\s\-+()]+$/.test(text.trim())) {
       await replyLineMessage(
@@ -82,6 +77,12 @@ async function processEvent(event: LineEvent) {
       );
       return;
     }
+
+    // 已經綁定過的客人就不要再提醒了，只對還沒綁定的人回覆
+    const { data: boundCustomerId } = await supabase.rpc("find_customer_id_by_line_user_id", {
+      p_line_user_id: userId,
+    });
+    if (boundCustomerId) return;
 
     // 不是指令、也不是電話號碼——順勢提醒對方綁定，用「回覆」不是「推播」所以不會占用訊息額度，
     // 剛好可以拿來觸及舊好友（他們本來就不會再收到 follow 事件的歡迎訊息）
