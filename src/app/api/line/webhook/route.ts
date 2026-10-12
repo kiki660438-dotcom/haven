@@ -72,6 +72,17 @@ async function processEvent(event: LineEvent) {
     });
     if (boundCustomerId) return;
 
+    // 看起來是在輸入電話（幾乎都是數字）但位數或開頭不對，直接告訴他哪裡錯，
+    // 不然他只會再收到同一句「請回覆手機號碼」，不知道是自己少打了一碼
+    const digitCount = text.replace(/[^0-9]/g, "").length;
+    if (digitCount >= 6 && /^[\d\s\-+()]+$/.test(text.trim())) {
+      await replyLineMessage(
+        event.replyToken,
+        `您輸入的號碼是 ${digitCount} 碼，台灣手機號碼需要 10 碼且 09 開頭（例如 0912345678），麻煩再確認一下後重新輸入～`
+      );
+      return;
+    }
+
     // 不是指令、也不是電話號碼——順勢提醒對方綁定，用「回覆」不是「推播」所以不會占用訊息額度，
     // 剛好可以拿來觸及舊好友（他們本來就不會再收到 follow 事件的歡迎訊息）
     await replyLineMessage(
