@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 const LINE_API = "https://api.line.me/v2/bot/message";
 
 export async function pushLineMessage(lineUserId: string, text: string) {
@@ -17,6 +19,17 @@ export async function pushLineMessage(lineUserId: string, text: string) {
   if (!res.ok) {
     console.error("pushLineMessage failed", res.status, await res.text().catch(() => ""));
   }
+}
+
+// 傳訊息給店主（在 LINE 傳「綁定管理員」的那個帳號）；還沒綁定就什麼都不做
+export async function notifyOwner(text: string) {
+  const { data: setting } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "owner_line_user_id")
+    .maybeSingle();
+  if (!setting?.value) return;
+  await pushLineMessage(setting.value, text);
 }
 
 export async function replyLineMessage(replyToken: string, text: string) {
