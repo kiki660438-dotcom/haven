@@ -5,6 +5,7 @@ import { verifyPhone, logoutCustomer, getAvailableSlots } from "../book/actions"
 import { cancelMyAppointment, rescheduleMyAppointment } from "./actions";
 import TimeSlotOption from "../components/TimeSlotOption";
 import SubmitButton from "../components/SubmitButton";
+import { getAdminClient } from "@/lib/supabase-admin";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -84,7 +85,20 @@ export default async function MyPage({
     );
   }
 
-  const [{ data: appointments }, { data: vouchers }] = await Promise.all([
+  // 消費紀錄含金額，不能走公開權限；只在伺服器端用 identity（已驗簽的 cookie）裡的客人 id 查，
+  // 沒設定金鑰時就不顯示這一區，其他功能不受影響
+  const admin = getAdminClient();
+  const ordersPromise = admin
+    ? admin
+        .from("orders")
+        .select("id, total, created_at, order_items(service_name, price, quantity)")
+        .eq("customer_id", identity.customerId)
+        .eq("status", "paid")
+        .order("created_at", { ascending: false })
+        .limit(50)
+    : Promise.resolve({ data: null });
+
+  const [{ data: appointments }, { data: vouchers }, { data: orders }] = await Promise.all([
     supabase
       .from("appointments")
       .select(
@@ -97,6 +111,7 @@ export default async function MyPage({
       .select("id, service_name, total_sessions, remaining_sessions, purchased_at, status")
       .eq("customer_id", identity.customerId)
       .order("purchased_at", { ascending: false }),
+    ordersPromise,
   ]);
 
   const now = Date.now();
@@ -274,6 +289,32 @@ export default async function MyPage({
             ))}
           </div>
         </details>
+      )}
+
+      {orders && (
+        <>
+          <h2 className="font-semibold mb-3">消費紀錄</h2>
+          <div className="flex flex-col gap-2 mb-6">
+            {orders.map((o) => (
+              <div key={o.id} className="p-3 border border-primary-light rounded-xl bg-white text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-foreground/60">
+                    {new Date(o.created_at).toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei" })}
+                  </span>
+                  <span className="font-medium">
+                    {o.total > 0 ? `實付 $${o.total}` : "商品券扣堂／贈送"}
+                  </span>
+                </div>
+                <p className="text-foreground/70 mt-1">
+                  {(o.order_items ?? [])
+                    .map((it) => (it.quantity > 1 ? `${it.service_name} x${it.quantity}` : it.service_name))
+                    .join("、")}
+                </p>
+              </div>
+            ))}
+            {orders.length === 0 && <p className="text-sm text-foreground/50">還沒有消費紀錄</p>}
+          </div>
+        </>
       )}
 
       <h2 className="font-semibold mb-3">歷史預約</h2>
