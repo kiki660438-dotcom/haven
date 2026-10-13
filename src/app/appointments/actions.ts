@@ -3,10 +3,32 @@
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { pushLineMessage } from "@/lib/line";
+
+function formatDateTime(iso: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
+}
 
 export async function updateAppointmentStatus(id: string, status: string) {
   const supabase = await createClient();
+
+  // 取消前先記下原本的狀態：只有「原本還有效」的預約被取消才通知客人，避免重複點擊重複通知
+  const { data: before } =
+    status === "cancelled"
+      ? await supabase.from("appointments").select("status").eq("id", id).maybeSingle()
+      : { data: null };
+
   await supabase.from("appointments").update({ status }).eq("id", id);
   revalidatePath("/appointments");
   revalidatePath("/appointments/calendar");
@@ -25,17 +47,7 @@ export async function updateAppointmentStatus(id: string, status: string) {
     const staff = Array.isArray(appointment?.staff) ? appointment.staff[0] : appointment?.staff;
 
     if (customer?.line_user_id && appointment) {
-      const parts = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Taipei",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).formatToParts(new Date(appointment.start_time));
-      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-      const dateTime = `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
+      const dateTime = formatDateTime(appointment.start_time);
       const staffName = staff?.name ?? "KIKI";
       const mapsUrl = "https://maps.app.goo.gl/rkyQPMQHHDYaGvRr5";
 
@@ -51,6 +63,24 @@ export async function updateAppointmentStatus(id: string, status: string) {
         .format(new Date(appointment.start_time))
         .slice(0, 7);
       redirect(`/appointments/calendar?month=${monthKey}`);
+    }
+  }
+
+  if (status === "cancelled" && before && (before.status === "pending" || before.status === "confirmed")) {
+    const { data: appointment } = await supabase
+      .from("appointments")
+      .select("start_time, customers(line_user_id, name), staff(name)")
+      .eq("id", id)
+      .single();
+
+    const customer = Array.isArray(appointment?.customers)
+      ? appointment.customers[0]
+      : appointment?.customers;
+    const staff = Array.isArray(appointment?.staff) ? appointment.staff[0] : appointment?.staff;
+
+    if (customer?.line_user_id && appointment) {
+      const text = `親愛的 ${customer.name ?? ""} 客人您好，您 ${formatDateTime(appointment.start_time)} 設計師${staff?.name ?? "Kiki"}該時段已有其他客人，暫時無法接受您的預約，再請您改約其他時間，謝謝！`;
+      after(() => pushLineMessage(customer.line_user_id, text));
     }
   }
 }
