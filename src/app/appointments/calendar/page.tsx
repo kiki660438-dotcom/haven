@@ -85,7 +85,7 @@ export default async function AppointmentsCalendarPage({
     .order("start_time", { ascending: true });
 
   const byDay = new Map<string, ApptRow[]>();
-  for (const a of (appointments ?? []) as ApptRow[]) {
+  for (const a of ((appointments ?? []) as ApptRow[]).filter((x) => x.status !== "cancelled")) {
     const key = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(
       new Date(a.start_time)
     );

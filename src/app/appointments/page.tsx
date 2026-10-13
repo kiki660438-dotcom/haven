@@ -75,11 +75,14 @@ export default async function AppointmentsPage({
   }));
 
   const filtered = withKey.filter((a) => {
+    // 已取消的預約只在「已取消」分頁看得到，其他畫面一律不顯示，避免版面雜亂
+    if (activeFilter === "cancelled") return a.status === "cancelled";
+    if (a.status === "cancelled") return false;
     if (activeFilter === "date") return a.dateKey === date;
     if (activeFilter === "pending") return a.status === "pending";
-    if (activeFilter === "today") return a.dateKey === today && a.status !== "cancelled";
+    if (activeFilter === "today") return a.dateKey === today;
     if (activeFilter === "all") return true;
-    return a.dateKey >= today && a.status !== "cancelled";
+    return a.dateKey >= today;
   });
 
   const groups = new Map<string, typeof filtered>();
@@ -94,6 +97,7 @@ export default async function AppointmentsPage({
     { key: "pending", label: pendingCount > 0 ? `待確認 (${pendingCount})` : "待確認" },
     { key: "today", label: "今天" },
     { key: "all", label: "全部" },
+    { key: "cancelled", label: "已取消" },
   ];
 
   return (
@@ -231,14 +235,17 @@ export default async function AppointmentsPage({
                           </form>
                         </>
                       )}
-                      <Link
-                        href={`/checkout?appointment=${a.id}`}
-                        className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
-                      >
-                        <ShoppingCart size={14} /> 開單
-                      </Link>
+                      {a.status !== "cancelled" && (
+                        <Link
+                          href={`/checkout?appointment=${a.id}`}
+                          className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
+                        >
+                          <ShoppingCart size={14} /> 開單
+                        </Link>
+                      )}
                     </div>
 
+                    {a.status !== "cancelled" && (
                     <details className="mt-2 group">
                       <summary className="text-xs text-foreground/50 cursor-pointer select-none inline-flex items-center gap-1 hover:text-primary-dark">
                         <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
@@ -252,6 +259,7 @@ export default async function AppointmentsPage({
                         defaultBufferMinutes={(a.buffer_minutes ?? maxServiceBuffer) % 60}
                       />
                     </details>
+                    )}
                   </div>
                 );
               })}
