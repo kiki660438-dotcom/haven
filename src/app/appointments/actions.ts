@@ -85,6 +85,21 @@ export async function updateAppointmentStatus(id: string, status: string) {
   }
 }
 
+// 客人自己要求取消、由店家在後台代為取消：只把狀態改成已取消（時段會自動開放給別人預約），
+// 不傳任何訊息給客人，因為取消是客人自己提出的
+export async function cancelAppointmentQuietly(id: string) {
+  const supabase = await createClient();
+  await supabase
+    .from("appointments")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .in("status", ["pending", "confirmed"]);
+  revalidatePath("/appointments");
+  revalidatePath("/appointments/calendar");
+  revalidatePath("/dashboard");
+  revalidatePath("/book");
+}
+
 export type UpdateTimeState = { ok: boolean; error?: string } | null;
 
 export async function updateAppointmentTime(

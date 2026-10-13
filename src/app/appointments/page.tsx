@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
-import { updateAppointmentStatus } from "./actions";
+import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
 import { Check, X, ShoppingCart, ChevronDown, Calendar, Plus } from "lucide-react";
 
@@ -212,11 +212,24 @@ export default async function AppointmentsPage({
                         </form>
                       )}
                       {a.status !== "cancelled" && a.status !== "completed" && (
-                        <form action={updateAppointmentStatus.bind(null, a.id, "cancelled")}>
-                          <button className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
-                            <X size={14} /> 取消
-                          </button>
-                        </form>
+                        <>
+                          <form action={cancelAppointmentQuietly.bind(null, a.id)}>
+                            <button
+                              title="客人自己要求取消，不會傳訊息給客人，時段會開放給別人預約"
+                              className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                              <X size={14} /> 客人取消
+                            </button>
+                          </form>
+                          <form action={updateAppointmentStatus.bind(null, a.id, "cancelled")}>
+                            <button
+                              title="店家排不了，婉拒客人：會傳 LINE 訊息通知客人，時段會開放給別人預約"
+                              className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              <X size={14} /> 婉拒預約
+                            </button>
+                          </form>
+                        </>
                       )}
                       <Link
                         href={`/checkout?appointment=${a.id}`}
