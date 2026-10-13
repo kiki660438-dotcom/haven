@@ -39,10 +39,6 @@ export default async function LoginPage({
           required
           className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
         />
-        <label className="flex items-center gap-2 text-sm text-foreground/70">
-          <input type="checkbox" name="remember" defaultChecked className="accent-primary-dark" />
-          記住我的帳號密碼
-        </label>
         <button
           type="submit"
           className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors"
