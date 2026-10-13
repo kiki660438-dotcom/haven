@@ -57,11 +57,16 @@ export default function Nav() {
 
   if (isPublic) {
     const isBook = pathname === "/book" || pathname.startsWith("/book/");
+    const isMy = pathname === "/my" || pathname.startsWith("/my/");
     return (
       <header className="bg-white border-b border-primary-light">
-        <div className="max-w-5xl mx-auto px-4 py-3">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-center gap-2">
+          {(isBook || isMy) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/icons/favicon-64.png" alt="" width={24} height={24} className="rounded" />
+          )}
           <span className="font-bold text-primary-dark">
-            Haven {isBook ? "線上預約" : "美髮管理"}
+            {isBook ? "Haven Hair 線上預約" : isMy ? "Haven Hair 會員中心" : "Haven 美髮管理"}
           </span>
         </div>
       </header>
