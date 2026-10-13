@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
@@ -36,6 +37,12 @@ function groupServices(services: ServiceOption[]) {
   }
   return [...map.entries()].map(([title, items]) => ({ title, items }));
 }
+
+export const metadata: Metadata = {
+  title: "Haven Hair 線上預約",
+  manifest: "/api/manifest?start=book",
+  appleWebApp: { capable: true, title: "Haven Hair", statusBarStyle: "default" },
+};
 
 export default async function BookPage({
   searchParams,

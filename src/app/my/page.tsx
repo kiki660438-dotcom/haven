@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { CalendarDays, Receipt, Scissors, Ticket } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -53,6 +54,12 @@ function dateParts(iso: string) {
 }
 
 const CARD = "bg-white rounded-2xl shadow-sm ring-1 ring-black/5";
+
+export const metadata: Metadata = {
+  title: "Haven Hair 會員中心",
+  manifest: "/api/manifest?start=my",
+  appleWebApp: { capable: true, title: "Haven Hair", statusBarStyle: "default" },
+};
 
 export default async function MyPage({
   searchParams,
