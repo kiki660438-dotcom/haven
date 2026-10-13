@@ -105,6 +105,7 @@ export default async function MyPage({
   );
   const past = (appointments ?? []).filter((a) => !upcoming.includes(a));
   const activeVouchers = (vouchers ?? []).filter((v) => v.status === "active");
+  const inactiveVouchers = (vouchers ?? []).filter((v) => v.status !== "active");
 
   const reschedulingAppointment = reschedule
     ? upcoming.find((a) => a.id === reschedule)
@@ -239,12 +240,41 @@ export default async function MyPage({
             <p className="text-sm text-primary-dark">
               剩餘 {v.remaining_sessions} / {v.total_sessions} 堂
             </p>
+            {v.purchased_at && (
+              <p className="text-xs text-foreground/50 mt-1">購買日期 {v.purchased_at}</p>
+            )}
           </div>
         ))}
         {activeVouchers.length === 0 && (
-          <p className="text-sm text-foreground/50">目前沒有商品券</p>
+          <p className="text-sm text-foreground/50">目前沒有可使用的商品券</p>
         )}
       </div>
+
+      {inactiveVouchers.length > 0 && (
+        <details className="mb-6">
+          <summary className="font-semibold mb-3 cursor-pointer select-none">
+            已用完／已過期的商品券（{inactiveVouchers.length}）
+          </summary>
+          <div className="flex flex-col gap-2 mt-3">
+            {inactiveVouchers.map((v) => (
+              <div
+                key={v.id}
+                className="p-3 border border-primary-light rounded-xl bg-white text-sm text-foreground/70 flex items-center justify-between gap-3"
+              >
+                <div>
+                  <p>{v.service_name}</p>
+                  {v.purchased_at && (
+                    <p className="text-xs text-foreground/50">購買日期 {v.purchased_at}</p>
+                  )}
+                </div>
+                <span className="whitespace-nowrap">
+                  {v.status === "expired" ? "已過期" : "已用完"}（共 {v.total_sessions} 堂）
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       <h2 className="font-semibold mb-3">歷史預約</h2>
       <div className="flex flex-col gap-2">
