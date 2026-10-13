@@ -4,6 +4,19 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/login", "/book", "/my"];
 
 export async function middleware(request: NextRequest) {
+  // 手機輸入網址常被自動大寫（例如 /Book），路由是區分大小寫的，會被當成沒開放的後台頁面丟去登入。
+  // 客人會用到的頁面遇到大小寫不同時，直接導回正確的小寫網址
+  const pathname = request.nextUrl.pathname;
+  const lowerPath = pathname.toLowerCase();
+  if (
+    lowerPath !== pathname &&
+    PUBLIC_PATHS.some((p) => lowerPath === p || lowerPath.startsWith(p + "/"))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = lowerPath;
+    return NextResponse.redirect(url);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
