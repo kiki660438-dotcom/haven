@@ -1,13 +1,11 @@
 -- 匯入 2026-09-23 ~ 2026-10-13 訂單（來自神美「2026-01-01-2026-10-14 訂單列表」，9/22 以前的早就匯入過），並補上這段期間用掉的商品券堂數。
 -- 營業額規則跟之前一致：orders.total 只算現場付款的現金/匯款，商品券折抵的不重複算。order_items.price 存單價。
--- 必須在 E-voucher_purchases_import_202609_202610.sql 執行「之後」才能跑（蔡慧勤、黃玉瑄的商品券要先存在）。
--- 保護：訂單那段若發現這段期間已經有匯入過就整段取消；扣堂那段每一張都先確認「目前剩餘堂數」跟預期一樣才扣，
---       任何一項對不上，整段取消、什麼都不改。
+-- （商品券堂數的校正改放在另一個檔案 voucher_state_fix_202610.sql，這個檔案只匯入訂單。）
+-- 保護：若發現這段期間已經有匯入過，整段取消、什麼都不改。
 do $do$
 declare
   v_customer_id uuid;
   v_order_id uuid;
-  n int;
 begin
   if exists (select 1 from orders where created_at >= '2026-09-23T00:00:00+08:00' and created_at < '2026-10-15T00:00:00+08:00' and (payment_method is not null or total = 0)) then
     raise exception '9/23 之後的訂單看起來已經匯入過了，為避免重複，已停止（沒有任何資料被寫入）';
@@ -469,86 +467,7 @@ begin
   insert into order_items (order_id, service_name, price, quantity) values (v_order_id, '蘊活再生頭皮精華-油掉(黃)', 0, 1);
   insert into order_items (order_id, service_name, price, quantity) values (v_order_id, '蘊活再生髮浴-豐健', 0, 1);
 
-  -- ===== 商品券扣堂（9/22 19:42 剩餘紀錄匯出之後用掉的）=====
-  -- Amor Huang：(5送1)植物草二合一短髮（2026-06-27 購買）10/9 用 1 堂，剩餘 5 → 4
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0910033140' and v.service_name = '(5送1)植物草二合一短髮' and v.purchased_at = '2026-06-27' and v.remaining_sessions = 5;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception 'Amor Huang 的「(5送1)植物草二合一短髮」目前剩餘堂數不是預期的 5（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 陳怡萍：(5送1)植物草三合一中髮（2025-12-01 購買）10/10 用 1 堂，剩餘 3 → 2
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0919363431' and v.service_name = '(5送1)植物草三合一中髮' and v.purchased_at = '2025-12-01' and v.remaining_sessions = 3;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '陳怡萍 的「(5送1)植物草三合一中髮」目前剩餘堂數不是預期的 3（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 黃沐薇：蘊髮再生療程12堂（2025-10-08 購買）10/11 用 1 堂（最舊的那張，剩 1 堂用完），剩餘 1 → 0
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0974358358' and v.service_name = '蘊髮再生療程12堂' and v.purchased_at = '2025-10-08' and v.remaining_sessions = 1;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '黃沐薇 的「蘊髮再生療程12堂」目前剩餘堂數不是預期的 1（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 黃沐薇：凍膜12堂（2025-10-08 購買）10/11 用 1 堂（最舊的那張，剩 1 堂用完），剩餘 1 → 0
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0974358358' and v.service_name = '凍膜12堂' and v.purchased_at = '2025-10-08' and v.remaining_sessions = 1;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '黃沐薇 的「凍膜12堂」目前剩餘堂數不是預期的 1（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 黃沐薇：洗髮12堂（2025-10-08 購買）10/11 用 1 堂（最舊的那張，剩 1 堂用完），剩餘 1 → 0
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0974358358' and v.service_name = '洗髮12堂' and v.purchased_at = '2025-10-08' and v.remaining_sessions = 1;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '黃沐薇 的「洗髮12堂」目前剩餘堂數不是預期的 1（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 蔡慧勤：(10送3)植物草三合一中髮（2026-10-09 購買）10/9 買完當天用 1 堂，剩餘 13 → 12
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0972003410' and v.service_name = '(10送3)植物草三合一中髮' and v.purchased_at = '2026-10-09' and v.remaining_sessions = 13;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '蔡慧勤 的「(10送3)植物草三合一中髮」目前剩餘堂數不是預期的 13（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 黃玉瑄：蘊髮再生療程12堂（2026-10-13 購買）10/13 買完當天用 1 堂，剩餘 12 → 11
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0912618908' and v.service_name = '蘊髮再生療程12堂' and v.purchased_at = '2026-10-13' and v.remaining_sessions = 12;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '黃玉瑄 的「蘊髮再生療程12堂」目前剩餘堂數不是預期的 12（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 黃玉瑄：洗髮12堂（2026-10-13 購買）10/13 用 1 堂（贈送），剩餘 12 → 11
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0912618908' and v.service_name = '洗髮12堂' and v.purchased_at = '2026-10-13' and v.remaining_sessions = 12;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '黃玉瑄 的「洗髮12堂」目前剩餘堂數不是預期的 12（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
-  -- 黃玉瑄：蘊活再生角質露(贈4堂)（2026-10-13 購買）10/13 用 1 堂（贈送），剩餘 4 → 3
-  update vouchers v set remaining_sessions = v.remaining_sessions - 1,
-    remaining_value = round(v.initial_value::numeric * (v.remaining_sessions - 1) / v.total_sessions),
-    status = case when v.remaining_sessions - 1 = 0 then 'used' else 'active' end
-  from customers c where c.id = v.customer_id and c.phone = '0912618908' and v.service_name = '蘊活再生角質露(贈4堂)' and v.purchased_at = '2026-10-13' and v.remaining_sessions = 4;
-  get diagnostics n = row_count;
-  if n <> 1 then raise exception '黃玉瑄 的「蘊活再生角質露(贈4堂)」目前剩餘堂數不是預期的 4（或找不到這張商品券），已全部取消，沒有任何資料被修改。'; end if;
-
 end $do$;
 
--- 執行完請對照：訂單應該是 61 筆、現場實收合計 199690（下面第一個查詢）；扣堂結果請看第二個查詢。
+-- 執行完請對照：訂單應該是 61 筆、現場實收合計 199690。
 select count(*) as 訂單數, coalesce(sum(total),0) as 現場實收合計 from orders where created_at >= '2026-09-23T00:00:00+08:00' and created_at < '2026-10-15T00:00:00+08:00' and (payment_method is not null or total = 0);
-select c.name as 客人, v.service_name as 商品券, v.remaining_sessions as 剩餘, v.total_sessions as 共, v.status as 狀態, v.purchased_at as 購買日
-from vouchers v join customers c on c.id = v.customer_id
-where c.phone in ('0910033140','0919363431','0974358358','0972003410','0912618908')
-  and v.service_name in ('(5送1)植物草二合一短髮','(5送1)植物草三合一中髮','蘊髮再生療程12堂','凍膜12堂','洗髮12堂','(10送3)植物草三合一中髮','蘊活再生角質露(贈4堂)')
-  and v.purchased_at in ('2026-06-27','2025-12-01','2025-10-08','2026-09-20','2026-10-09','2026-10-13')
-order by c.name, v.service_name, v.purchased_at;
