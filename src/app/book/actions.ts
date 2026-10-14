@@ -11,6 +11,7 @@ import {
   signCustomerToken,
 } from "@/lib/customer-identity";
 import { pushLineMessage } from "@/lib/line";
+import { monthlyOpenMaxDate, parseMonthlyOpen } from "@/lib/booking-window";
 
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 18;
@@ -152,18 +153,24 @@ export async function findAvailableStaff(
   return { ok: false, staffId: null };
 }
 
-// 線上預約最多能約到幾天後，店主可在「系統設定」調整，預設 30 天
-export async function getMaxAdvanceBookingDays() {
+// 客人最多能約到哪一天，優先順序：
+// 1) 店主指定的固定日期（booking_open_until）
+// 2) 每月固定日開放下個月（booking_monthly_open，例如 "15:20" = 每月 15 號晚上 8 點）
+// 3) 從今天起算 N 天（booking_max_advance_days，預設 30）
+export async function getMaxAdvanceBookingDate() {
   const { data } = await supabase
     .from("app_settings")
-    .select("value")
-    .eq("key", "booking_max_advance_days")
-    .maybeSingle();
-  return Number(data?.value) || 30;
-}
+    .select("key, value")
+    .in("key", ["booking_open_until", "booking_monthly_open", "booking_max_advance_days"]);
+  const get = (k: string) => data?.find((r) => r.key === k)?.value;
 
-export async function getMaxAdvanceBookingDate() {
-  const days = await getMaxAdvanceBookingDays();
+  const fixed = get("booking_open_until");
+  if (fixed && /^\d{4}-\d{2}-\d{2}$/.test(fixed)) return fixed;
+
+  const monthly = parseMonthlyOpen(get("booking_monthly_open"));
+  if (monthly) return monthlyOpenMaxDate(monthly.day, monthly.hour);
+
+  const days = Number(get("booking_max_advance_days")) || 30;
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
   const [y, m, d] = today.split("-").map(Number);
   const max = new Date(Date.UTC(y, m - 1, d) + days * 86_400_000);
