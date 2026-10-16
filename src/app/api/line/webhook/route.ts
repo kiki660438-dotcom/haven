@@ -30,7 +30,7 @@ const KEYWORD_REPLIES: Record<string, Parameters<typeof replyLineMessage>[1]> = 
     previewImageUrl: SITE + path,
   })),
   營業時間:
-    "【營業時間】\n11:00 – 18:00\n預約制，不接受當日預約\n\n公休日請看 Instagram 公告 🙏\n\n線上預約：" +
+    "【營業時間】\n11:00 – 18:00\n預約制，不接受當日預約\n\n公休日請看 Instagram 公告：\nhttps://www.instagram.com/haven_hh_/\n\n線上預約：" +
     SITE +
     "/book",
 };
