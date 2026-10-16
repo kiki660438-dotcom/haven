@@ -9,6 +9,7 @@ import TimeSlotOption from "../components/TimeSlotOption";
 import SubmitButton from "../components/SubmitButton";
 import PendingGetForm from "../components/PendingGetForm";
 import { getAdminClient } from "@/lib/supabase-admin";
+import { earliestBookingDate } from "@/lib/booking-window";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -310,6 +311,7 @@ export default async function MyPage({
                           name="r_date"
                           type="date"
                           required
+                          min={earliestBookingDate()}
                           defaultValue={r_date ?? ""}
                           className="flex-1 min-w-0 rounded-xl bg-[#f6fafc] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
                         />

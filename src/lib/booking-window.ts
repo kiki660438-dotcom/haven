@@ -34,3 +34,9 @@ export function parseMonthlyOpen(value: string | undefined | null) {
   if (day < 1 || day > 28 || hour < 0 || hour > 23) return null;
   return { day, hour };
 }
+
+// 客人最早能約的日期（不接受當日預約）：台北時間的明天
+export function earliestBookingDate(now = new Date()) {
+  const { y, m, d } = taipeiNow(now);
+  return new Date(Date.UTC(y, m - 1, d) + 86_400_000).toISOString().slice(0, 10);
+}

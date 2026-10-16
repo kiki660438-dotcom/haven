@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
 import { notifyOwner } from "@/lib/line";
 import { findAvailableStaff, getServicesDuration } from "../book/actions";
+import { earliestBookingDate } from "@/lib/booking-window";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString("zh-TW", {
@@ -82,6 +83,10 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
 
   if (!date || !time) {
     redirect(`/my?reschedule=${appointmentId}&r_date=${date ?? ""}&error=no_slot`);
+  }
+
+  if (date < earliestBookingDate()) {
+    redirect(`/my?reschedule=${appointmentId}&r_date=${date}&error=no_slot`);
   }
 
   const { data: appointment } = await supabase

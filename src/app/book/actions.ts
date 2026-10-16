@@ -11,7 +11,7 @@ import {
   signCustomerToken,
 } from "@/lib/customer-identity";
 import { pushLineMessage } from "@/lib/line";
-import { monthlyOpenMaxDate, parseMonthlyOpen } from "@/lib/booking-window";
+import { earliestBookingDate, monthlyOpenMaxDate, parseMonthlyOpen } from "@/lib/booking-window";
 
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 18;
@@ -193,6 +193,7 @@ export async function getFullDayClosureInfo(date: string) {
 
 export async function getAvailableSlots(serviceIds: string[], date: string, staffId?: string) {
   if (serviceIds.length === 0) return [];
+  if (date < earliestBookingDate()) return [];
 
   // 這三個查詢互不依賴，平行查比一個一個等快很多
   const [closed, { duration, maxBuffer }, activeStaffIds] = await Promise.all([
@@ -385,6 +386,10 @@ export async function createBooking(formData: FormData) {
 
   if (date > maxDate) {
     redirect(`/book?${query}&error=too_far`);
+  }
+
+  if (date < earliestBookingDate()) {
+    redirect(`/book?${query}&error=too_soon`);
   }
 
   const start_time = `${date}T${time}:00+08:00`;

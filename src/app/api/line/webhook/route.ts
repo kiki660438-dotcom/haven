@@ -20,6 +20,21 @@ function isValidSignature(body: string, signature: string | null) {
   return hash === signature;
 }
 
+const SITE = "https://haven-flax.vercel.app";
+
+// 選單按鈕或客人直接輸入這些關鍵字時，不論有沒有綁定都要回覆
+const KEYWORD_REPLIES: Record<string, Parameters<typeof replyLineMessage>[1]> = {
+  價目表: ["/menu/price-list.png", "/menu/price-list-herb.png"].map((path) => ({
+    type: "image" as const,
+    originalContentUrl: SITE + path,
+    previewImageUrl: SITE + path,
+  })),
+  營業時間:
+    "【營業時間】\n11:00 – 18:00\n預約制，不接受當日預約\n\n公休日請看 Instagram 公告 🙏\n\n線上預約：" +
+    SITE +
+    "/book",
+};
+
 function normalizePhone(text: string) {
   const digits = text.replace(/[^0-9]/g, "");
   return /^09\d{8}$/.test(digits) ? digits : null;
@@ -42,6 +57,12 @@ async function processEvent(event: LineEvent) {
     if (text === "綁定管理員") {
       await supabase.rpc("set_owner_line_user_id", { p_line_user_id: userId });
       await replyLineMessage(event.replyToken, "已設定為管理員通知帳號，之後有新的線上預約會通知您 ✅");
+      return;
+    }
+
+    const keywordReply = KEYWORD_REPLIES[text.trim()];
+    if (keywordReply) {
+      await replyLineMessage(event.replyToken, keywordReply);
       return;
     }
 

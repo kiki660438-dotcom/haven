@@ -32,17 +32,19 @@ export async function notifyOwner(text: string) {
   await pushLineMessage(setting.value, text);
 }
 
-export async function replyLineMessage(replyToken: string, text: string) {
+type LineMessage =
+  | { type: "text"; text: string }
+  | { type: "image"; originalContentUrl: string; previewImageUrl: string };
+
+export async function replyLineMessage(replyToken: string, message: string | LineMessage[]) {
+  const messages = typeof message === "string" ? [{ type: "text" as const, text: message }] : message;
   const res = await fetch(`${LINE_API}/reply`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
     },
-    body: JSON.stringify({
-      replyToken,
-      messages: [{ type: "text", text }],
-    }),
+    body: JSON.stringify({ replyToken, messages }),
   });
   if (!res.ok) {
     console.error("replyLineMessage failed", res.status, await res.text().catch(() => ""));

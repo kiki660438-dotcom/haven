@@ -14,6 +14,7 @@ import { ChevronDown } from "lucide-react";
 import TimeSlotOption from "../components/TimeSlotOption";
 import SubmitButton from "../components/SubmitButton";
 import PendingGetForm from "../components/PendingGetForm";
+import { earliestBookingDate } from "@/lib/booking-window";
 
 function buildQuery(serviceIds: string[], date: string, staffId?: string) {
   const params = new URLSearchParams();
@@ -71,10 +72,12 @@ export default async function BookPage({
   const singleServiceGroups = serviceGroups.filter((g) => g.items.length === 1);
   const multiServiceGroups = serviceGroups.filter((g) => g.items.length > 1);
 
+  const minDate = earliestBookingDate();
   const tooFar = !!date && date > maxDate;
-  const closedInfo = tooFar ? null : rawClosedInfo;
+  const tooSoon = !!date && date < minDate;
+  const closedInfo = tooFar || tooSoon ? null : rawClosedInfo;
   const slots =
-    serviceIds.length > 0 && date && !closedInfo && !tooFar
+    serviceIds.length > 0 && date && !closedInfo && !tooFar && !tooSoon
       ? await getAvailableSlots(serviceIds, date, staff_id)
       : null;
 
@@ -123,6 +126,11 @@ export default async function BookPage({
           LINE 登入失敗，請再試一次。
         </div>
       )}
+      {error === "too_soon" && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          抱歉，不接受當日預約，請選擇明天以後的日期。
+        </div>
+      )}
       {error === "closed" && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
           抱歉，這天公休，請選擇其他日期。
@@ -136,6 +144,11 @@ export default async function BookPage({
       {closedInfo && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
           這天公休{closedInfo.note ? `（${closedInfo.note}）` : ""}，請選擇其他日期。
+        </div>
+      )}
+      {tooSoon && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          不接受當日預約，請選擇明天以後的日期。
         </div>
       )}
       {tooFar && (
@@ -213,6 +226,7 @@ export default async function BookPage({
             name="date"
             type="date"
             required
+            min={minDate}
             max={maxDate}
             defaultValue={date ?? ""}
             className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
