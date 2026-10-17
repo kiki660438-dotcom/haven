@@ -177,6 +177,40 @@ export async function getMaxAdvanceBookingDate() {
   return max.toISOString().slice(0, 10);
 }
 
+// 從 from 起算半年內「整天都不能預約」的日期：全店公休，或每一位在職設計師都整天請假。
+// 預約頁的月曆用它把公休日標紅、不讓客人點到
+export async function getClosedDates(from: string): Promise<string[]> {
+  const startMs = Date.parse(`${from}T00:00:00Z`);
+  const endMs = startMs + 180 * 86_400_000;
+  const to = new Date(endMs).toISOString().slice(0, 10);
+
+  const [{ data: leaves }, activeStaffIds] = await Promise.all([
+    supabase
+      .from("staff_leave")
+      .select("staff_id, start_date, end_date")
+      .eq("all_day", true)
+      .lte("start_date", to)
+      .gte("end_date", from),
+    getActiveStaffIds(),
+  ]);
+
+  const coverage = new Map<string, Set<string | null>>();
+  for (const l of leaves ?? []) {
+    const first = Math.max(Date.parse(`${l.start_date}T00:00:00Z`), startMs);
+    const last = Math.min(Date.parse(`${l.end_date}T00:00:00Z`), endMs);
+    for (let t = first; t <= last; t += 86_400_000) {
+      const d = new Date(t).toISOString().slice(0, 10);
+      if (!coverage.has(d)) coverage.set(d, new Set());
+      coverage.get(d)!.add(l.staff_id);
+    }
+  }
+
+  return [...coverage.entries()]
+    .filter(([, who]) => who.has(null) || (activeStaffIds.length > 0 && activeStaffIds.every((id) => who.has(id))))
+    .map(([d]) => d)
+    .sort();
+}
+
 // 全門店整天請假（公休）才回傳資訊，用來在頁面上顯示明確的「公休」訊息；
 // 單一設計師或部分時段的請假只會讓時段選項變少，不會顯示這個訊息
 export async function getFullDayClosureInfo(date: string) {

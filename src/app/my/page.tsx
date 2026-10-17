@@ -3,11 +3,18 @@ import { cookies } from "next/headers";
 import { CalendarDays, Receipt, Scissors, Ticket } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
-import { verifyPhone, logoutCustomer, getAvailableSlots } from "../book/actions";
+import {
+  verifyPhone,
+  logoutCustomer,
+  getAvailableSlots,
+  getClosedDates,
+  getMaxAdvanceBookingDate,
+} from "../book/actions";
 import { cancelMyAppointment, rescheduleMyAppointment } from "./actions";
 import TimeSlotOption from "../components/TimeSlotOption";
 import SubmitButton from "../components/SubmitButton";
 import PendingGetForm from "../components/PendingGetForm";
+import DatePicker from "../components/DatePicker";
 import { getAdminClient } from "@/lib/supabase-admin";
 import { earliestBookingDate } from "@/lib/booking-window";
 
@@ -187,6 +194,9 @@ export default async function MyPage({
       ? reschedulingAppointment.appointment_services.map((row) => row.service_id)
       : [reschedulingAppointment.service_id]
     : [];
+  const [rescheduleClosedDates, rescheduleMaxDate] = reschedulingAppointment
+    ? await Promise.all([getClosedDates(earliestBookingDate()), getMaxAdvanceBookingDate()])
+    : [[], ""];
   const rescheduleSlots =
     reschedulingAppointment && r_date
       ? await getAvailableSlots(
@@ -304,16 +314,15 @@ export default async function MyPage({
                         action="/my"
                         label="查詢時段"
                         pendingLabel="查詢中…"
-                        className="flex gap-2"
+                        className="flex flex-col gap-2"
                       >
                         <input type="hidden" name="reschedule" value={a.id} />
-                        <input
+                        <DatePicker
                           name="r_date"
-                          type="date"
-                          required
                           min={earliestBookingDate()}
-                          defaultValue={r_date ?? ""}
-                          className="flex-1 min-w-0 rounded-xl bg-[#f6fafc] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                          max={rescheduleMaxDate}
+                          closed={rescheduleClosedDates}
+                          defaultValue={r_date}
                         />
                       </PendingGetForm>
 

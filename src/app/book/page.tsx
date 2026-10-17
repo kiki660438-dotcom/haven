@@ -5,6 +5,7 @@ import { verifyCustomerToken, CUSTOMER_COOKIE } from "@/lib/customer-identity";
 import {
   createBooking,
   getAvailableSlots,
+  getClosedDates,
   getFullDayClosureInfo,
   getMaxAdvanceBookingDate,
   verifyPhone,
@@ -14,6 +15,7 @@ import { ChevronDown } from "lucide-react";
 import TimeSlotOption from "../components/TimeSlotOption";
 import SubmitButton from "../components/SubmitButton";
 import PendingGetForm from "../components/PendingGetForm";
+import DatePicker from "../components/DatePicker";
 import { earliestBookingDate } from "@/lib/booking-window";
 
 function buildQuery(serviceIds: string[], date: string, staffId?: string) {
@@ -60,10 +62,12 @@ export default async function BookPage({
   const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
 
   // 這三個查詢互不依賴，平行查比一個一個等快很多
-  const [{ data: allServices }, maxDate, rawClosedInfo] = await Promise.all([
+  const minDate = earliestBookingDate();
+  const [{ data: allServices }, maxDate, rawClosedInfo, closedDates] = await Promise.all([
     supabase.from("services").select("*").order("name"),
     getMaxAdvanceBookingDate(),
     date ? getFullDayClosureInfo(date) : Promise.resolve(null),
+    getClosedDates(minDate),
   ]);
 
   // 商品券方案（有堂數的服務）只在店內結帳銷售，加上被標記「不開放線上預約」的項目，線上預約選單都不顯示
@@ -72,7 +76,6 @@ export default async function BookPage({
   const singleServiceGroups = serviceGroups.filter((g) => g.items.length === 1);
   const multiServiceGroups = serviceGroups.filter((g) => g.items.length > 1);
 
-  const minDate = earliestBookingDate();
   const tooFar = !!date && date > maxDate;
   const tooSoon = !!date && date < minDate;
   const closedInfo = tooFar || tooSoon ? null : rawClosedInfo;
@@ -220,18 +223,10 @@ export default async function BookPage({
             })}
           </div>
         </div>
-        <label className="flex flex-col gap-1 text-sm text-foreground/60">
-          選擇日期 *
-          <input
-            name="date"
-            type="date"
-            required
-            min={minDate}
-            max={maxDate}
-            defaultValue={date ?? ""}
-            className="border border-primary-light rounded-lg px-3 py-2 focus:outline-none focus:border-primary"
-          />
-        </label>
+        <div>
+          <p className="text-sm mb-2 text-foreground/60">選擇日期 *</p>
+          <DatePicker name="date" min={minDate} max={maxDate} closed={closedDates} defaultValue={date} />
+        </div>
       </PendingGetForm>
 
       {slots && !identity && (
