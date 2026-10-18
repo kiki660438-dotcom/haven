@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("scope", "profile");
+  authorizeUrl.searchParams.set("bot_prompt", "normal");
 
   const response = NextResponse.redirect(authorizeUrl.toString());
   response.cookies.set("line_login_state", state, {
