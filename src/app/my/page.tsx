@@ -273,7 +273,7 @@ export default async function MyPage({
                 <div key={a.id} className={`${CARD} p-4`}>
                   <div className="flex gap-4">
                     <div className="shrink-0 w-14 rounded-xl bg-primary-light text-primary-dark text-center py-2">
-                      <p className="text-[11px] leading-none">{p.month}月</p>
+                      <p className="text-[11px] leading-none">{p.month}</p>
                       <p className="text-2xl font-bold leading-tight">{p.day}</p>
                       <p className="text-[11px] leading-none">{p.weekday}</p>
                     </div>
