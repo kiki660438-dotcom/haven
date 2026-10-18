@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
-import { Check, X, ShoppingCart, ChevronDown, Calendar, Plus } from "lucide-react";
+import { Check, X, ShoppingCart, ChevronDown, Calendar, CalendarSearch, Plus } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -112,6 +112,12 @@ export default async function AppointmentsPage({
             <Plus size={14} /> 新增預約
           </Link>
           <Link
+            href="/appointments/day"
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
+          >
+            <CalendarSearch size={14} /> 今日預約
+          </Link>
+          <Link
             href="/appointments/calendar"
             className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"
           >
@@ -180,13 +186,23 @@ export default async function AppointmentsPage({
                           minute: "2-digit",
                         })}
                       </span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
-                          statusStyle[a.status] ?? "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {statusLabel[a.status] ?? a.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                            statusStyle[a.status] ?? "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {statusLabel[a.status] ?? a.status}
+                        </span>
+                        <Link
+                          href={`/appointments/day?date=${a.dateKey}`}
+                          title="查看這天所有預約"
+                          aria-label="查看這天所有預約"
+                          className="p-1.5 rounded-lg text-primary-dark hover:bg-primary-light transition-colors"
+                        >
+                          <CalendarSearch size={18} />
+                        </Link>
+                      </div>
                     </div>
 
                     <p className="font-semibold mt-1">

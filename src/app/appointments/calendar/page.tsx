@@ -154,7 +154,7 @@ export default async function AppointmentsCalendarPage({
           return (
             <Link
               key={key}
-              href={`/appointments?date=${key}`}
+              href={`/appointments/day?date=${key}`}
               className={`min-h-24 sm:min-h-28 p-1.5 rounded-lg border text-left flex flex-col gap-1 transition-colors ${
                 inMonth
                   ? "bg-white border-primary-light hover:bg-primary-light/40"
