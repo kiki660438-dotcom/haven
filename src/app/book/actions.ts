@@ -11,7 +11,7 @@ import {
   signCustomerToken,
 } from "@/lib/customer-identity";
 import { pushLineMessage } from "@/lib/line";
-import { earliestBookingDate, monthlyOpenMaxDate, parseMonthlyOpen } from "@/lib/booking-window";
+import { clampPartySize, earliestBookingDate, monthlyOpenMaxDate, parseMonthlyOpen } from "@/lib/booking-window";
 
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 18;
@@ -73,7 +73,7 @@ async function getBusyIntervals(
   let query = supabase
     .from("appointments")
     .select(
-      "id, start_time, status, staff_id, buffer_minutes, services(duration_minutes, buffer_minutes), appointment_services(services(duration_minutes, buffer_minutes))"
+      "id, start_time, status, staff_id, buffer_minutes, party_size, services(duration_minutes, buffer_minutes), appointment_services(services(duration_minutes, buffer_minutes))"
     )
     .neq("status", "cancelled")
     .gte("start_time", dayStart)
@@ -110,7 +110,9 @@ async function getBusyIntervals(
       const start = new Date(a.start_time).getTime();
       // 每筆預約可以自己覆寫緩衝時間（在「預約管理」設定），沒設過就用服務項目的預設值
       const buffer = a.buffer_minutes ?? serviceBuffer;
-      return { start, end: start + (duration + buffer) * 60_000 };
+      // 多人同時預約時，設計師要一個一個做，占用時間＝人數 × 服務時長
+      const partySize = a.party_size ?? 1;
+      return { start, end: start + (duration * partySize + buffer) * 60_000 };
     });
 
   return [...appointmentIntervals, ...leaveIntervals];
@@ -225,7 +227,12 @@ export async function getFullDayClosureInfo(date: string) {
   return data?.[0] ?? null;
 }
 
-export async function getAvailableSlots(serviceIds: string[], date: string, staffId?: string) {
+export async function getAvailableSlots(
+  serviceIds: string[],
+  date: string,
+  staffId?: string,
+  partySize = 1
+) {
   if (serviceIds.length === 0) return [];
   if (date < earliestBookingDate()) return [];
 
@@ -238,7 +245,7 @@ export async function getAvailableSlots(serviceIds: string[], date: string, staf
   if (closed) return [];
   if (duration === 0) return [];
 
-  const durationMs = (duration + maxBuffer) * 60_000;
+  const durationMs = (duration * clampPartySize(partySize) + maxBuffer) * 60_000;
 
   let busyLists: BusyInterval[][];
   if (staffId) {
@@ -354,7 +361,8 @@ async function notifyOwnerOfNewBooking(
   customer_id: string,
   service_ids: string[],
   start_time: string,
-  note: string | null
+  note: string | null,
+  partySize: number
 ) {
   const { data: setting } = await supabase
     .from("app_settings")
@@ -381,7 +389,8 @@ async function notifyOwnerOfNewBooking(
   await pushLineMessage(
     setting.value,
     `有新的線上預約！\n${customer?.name ?? ""}（${customer?.phone ?? ""}）\n${time}\n${serviceNames}${
-      note ? `\n備註：${note}` : ""
+      partySize > 1 ? `\n人數：${partySize} 位` : ""
+    }${note ? `\n備註：${note}` : ""
     }\n請到後台確認`
   );
 }
@@ -393,7 +402,8 @@ export async function createBooking(formData: FormData) {
   const time = formData.get("time") as string;
   const requestedStaffId = (formData.get("staff_id") as string) || null;
   const note = ((formData.get("note") as string) || "").trim() || null;
-  const query = `service_id=${service_ids.join(",")}&date=${date}`;
+  const partySize = clampPartySize(formData.get("people"));
+  const query = `service_id=${service_ids.join(",")}&date=${date}&people=${partySize}`;
 
   if (!customer_id) {
     redirect(`/book?${query}&error=no_identity`);
@@ -428,7 +438,7 @@ export async function createBooking(formData: FormData) {
 
   const start_time = `${date}T${time}:00+08:00`;
   const startMs = new Date(start_time).getTime();
-  const durationMs = (duration + maxBuffer) * 60_000;
+  const durationMs = (duration * partySize + maxBuffer) * 60_000;
 
   const { ok, staffId } = await findAvailableStaff(date, startMs, startMs + durationMs, requestedStaffId);
   if (!ok) {
@@ -444,6 +454,7 @@ export async function createBooking(formData: FormData) {
       status: "pending",
       staff_id: staffId,
       buffer_minutes: maxBuffer,
+      party_size: partySize,
       note,
     })
     .select("id")
@@ -461,7 +472,7 @@ export async function createBooking(formData: FormData) {
 
   // 推播通知給妳這個動作會呼叫 LINE 的 API，網路慢的時候客人送出預約會卡在等這個跑完才能跳轉——
   // 用 after() 讓它在回應送出之後才在背景執行，不要讓客人等
-  after(() => notifyOwnerOfNewBooking(customer_id, service_ids, start_time, note));
+  after(() => notifyOwnerOfNewBooking(customer_id, service_ids, start_time, note, partySize));
 
   revalidatePath("/book");
   revalidatePath("/appointments");

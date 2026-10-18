@@ -150,7 +150,7 @@ export default async function MyPage({
     supabase
       .from("appointments")
       .select(
-        "id, start_time, status, service_id, staff_id, services(name, price), appointment_services(service_id, services(name, price))"
+        "id, start_time, status, service_id, staff_id, party_size, services(name, price), appointment_services(service_id, services(name, price))"
       )
       .eq("customer_id", identity.customerId)
       .order("start_time", { ascending: false }),
@@ -202,7 +202,8 @@ export default async function MyPage({
       ? await getAvailableSlots(
           reschedulingServiceIds,
           r_date,
-          reschedulingAppointment.staff_id ?? undefined
+          reschedulingAppointment.staff_id ?? undefined,
+          reschedulingAppointment.party_size ?? 1
         )
       : null;
 

@@ -40,3 +40,9 @@ export function earliestBookingDate(now = new Date()) {
   const { y, m, d } = taipeiNow(now);
   return new Date(Date.UTC(y, m - 1, d) + 86_400_000).toISOString().slice(0, 10);
 }
+
+// 預約人數限制在 1~5 位
+export function clampPartySize(raw: unknown) {
+  const n = Math.floor(Number(raw));
+  return Number.isFinite(n) ? Math.min(Math.max(n, 1), 5) : 1;
+}

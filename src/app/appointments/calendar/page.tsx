@@ -9,6 +9,12 @@ const statusDot: Record<string, string> = {
   completed: "bg-gray-300",
 };
 
+const statusChip: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800",
+  confirmed: "bg-primary-light text-primary-dark",
+  completed: "bg-gray-100 text-gray-500",
+};
+
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const MAX_CHIPS_PER_DAY = 3;
 
@@ -155,7 +161,7 @@ export default async function AppointmentsCalendarPage({
             <Link
               key={key}
               href={`/appointments/day?date=${key}`}
-              className={`min-h-24 sm:min-h-28 p-1.5 rounded-lg border text-left flex flex-col gap-1 transition-colors ${
+              className={`min-h-24 sm:min-h-28 p-1 sm:p-1.5 rounded-lg border text-left flex flex-col gap-1 transition-colors ${
                 inMonth
                   ? "bg-white border-primary-light hover:bg-primary-light/40"
                   : "bg-gray-50 border-gray-100 text-foreground/30 hover:bg-gray-100"
@@ -168,14 +174,21 @@ export default async function AppointmentsCalendarPage({
               >
                 {c.day}
               </span>
-              {/* 手機版空間太窄放不下文字，只顯示狀態色點；桌機顯示時間＋姓名 */}
-              <div className="flex sm:hidden flex-wrap gap-0.5">
-                {shown.map((a) => (
-                  <span
-                    key={a.id}
-                    className={`w-1.5 h-1.5 rounded-full ${statusDot[a.status] ?? "bg-gray-300"}`}
-                  />
-                ))}
+              {/* 手機版格子很窄，只放姓名（依狀態上色）；桌機顯示時間＋姓名 */}
+              <div className="flex sm:hidden flex-col gap-0.5">
+                {shown.map((a) => {
+                  const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
+                  return (
+                    <span
+                      key={a.id}
+                      className={`block truncate rounded px-0.5 text-[10px] leading-4 ${
+                        statusChip[a.status] ?? "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {customer?.name}
+                    </span>
+                  );
+                })}
                 {extra > 0 && (
                   <span className="text-[10px] text-foreground/40 leading-none">+{extra}</span>
                 )}

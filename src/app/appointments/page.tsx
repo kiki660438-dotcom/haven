@@ -62,7 +62,7 @@ export default async function AppointmentsPage({
   const { data: appointments } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, buffer_minutes, note, customers(name, phone), staff(name), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
+      "id, start_time, status, buffer_minutes, party_size, note, customers(name, phone), staff(name), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
     )
     .order("start_time", { ascending: true });
 
@@ -213,6 +213,11 @@ export default async function AppointmentsPage({
                       {staff?.name && (
                         <span className="font-normal text-xs text-primary-dark ml-2">
                           指定 {staff.name}
+                        </span>
+                      )}
+                      {(a.party_size ?? 1) > 1 && (
+                        <span className="font-normal text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 ml-2">
+                          {a.party_size} 位
                         </span>
                       )}
                     </p>

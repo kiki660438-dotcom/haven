@@ -66,7 +66,7 @@ export default async function DayPage({
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, note, created_at, customers(name, phone), staff(name), services(name, price, duration_minutes), appointment_services(services(name, price, duration_minutes))"
+      "id, start_time, status, note, created_at, party_size, customers(name, phone), staff(name), services(name, price, duration_minutes), appointment_services(services(name, price, duration_minutes))"
     )
     .neq("status", "cancelled")
     .gte("start_time", `${weekStart}T00:00:00+08:00`)
@@ -193,7 +193,8 @@ export default async function DayPage({
                   .filter((s): s is ServiceRow => !!s);
                 const single = Array.isArray(a.services) ? a.services[0] : a.services;
                 const services = linked.length > 0 ? linked : single ? [single as ServiceRow] : [];
-                const duration = services.reduce((max, s) => Math.max(max, s.duration_minutes ?? 60), 0);
+                const duration =
+                  services.reduce((max, s) => Math.max(max, s.duration_minutes ?? 60), 0) * (a.party_size ?? 1);
 
                 return (
                   <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
@@ -203,6 +204,11 @@ export default async function DayPage({
                         <span className="font-normal text-xs text-foreground/50 ml-2">{customer?.phone}</span>
                         {staff?.name && (
                           <span className="font-normal text-xs text-primary-dark ml-2">指定 {staff.name}</span>
+                        )}
+                        {(a.party_size ?? 1) > 1 && (
+                          <span className="font-normal text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 ml-2">
+                            {a.party_size} 位
+                          </span>
                         )}
                       </p>
                       <span

@@ -16,13 +16,14 @@ import TimeSlotOption from "../components/TimeSlotOption";
 import SubmitButton from "../components/SubmitButton";
 import PendingGetForm from "../components/PendingGetForm";
 import DatePicker from "../components/DatePicker";
-import { earliestBookingDate } from "@/lib/booking-window";
+import { clampPartySize, earliestBookingDate } from "@/lib/booking-window";
 
-function buildQuery(serviceIds: string[], date: string, staffId?: string) {
+function buildQuery(serviceIds: string[], date: string, staffId: string | undefined, people: number) {
   const params = new URLSearchParams();
   for (const id of serviceIds) params.append("service_id", id);
   params.set("date", date ?? "");
   params.set("staff_id", staffId ?? "");
+  params.set("people", String(people));
   return params.toString();
 }
 
@@ -56,9 +57,11 @@ export default async function BookPage({
     service_id?: string | string[];
     date?: string;
     staff_id?: string;
+    people?: string;
   }>;
 }) {
-  const { success, error, service_id, date, staff_id } = await searchParams;
+  const { success, error, service_id, date, staff_id, people } = await searchParams;
+  const partySize = clampPartySize(people);
   const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
 
   // 這三個查詢互不依賴，平行查比一個一個等快很多
@@ -81,13 +84,13 @@ export default async function BookPage({
   const closedInfo = tooFar || tooSoon ? null : rawClosedInfo;
   const slots =
     serviceIds.length > 0 && date && !closedInfo && !tooFar && !tooSoon
-      ? await getAvailableSlots(serviceIds, date, staff_id)
+      ? await getAvailableSlots(serviceIds, date, staff_id, partySize)
       : null;
 
   const cookieStore = await cookies();
   const identity = verifyCustomerToken(cookieStore.get(CUSTOMER_COOKIE)?.value);
 
-  const returnTo = `/book?${buildQuery(serviceIds, date ?? "", staff_id)}`;
+  const returnTo = `/book?${buildQuery(serviceIds, date ?? "", staff_id, partySize)}`;
   const lineLoginUrl = `/api/line/login?returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
@@ -223,6 +226,26 @@ export default async function BookPage({
             })}
           </div>
         </div>
+        <label className="flex flex-col gap-1 text-sm text-foreground/60">
+          預約人數（每位都做同樣的服務）
+          <select
+            name="people"
+            defaultValue={String(partySize)}
+            className="border border-primary-light rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary bg-white"
+          >
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n} 位
+              </option>
+            ))}
+          </select>
+          {partySize > 1 && (
+            <span className="text-xs text-foreground/50">
+              多人會依序服務，所需時間是單人的 {partySize} 倍，可選的時段會變少。
+            </span>
+          )}
+        </label>
+
         <div>
           <p className="text-sm mb-2 text-foreground/60">選擇日期 *</p>
           <DatePicker name="date" min={minDate} max={maxDate} closed={closedDates} defaultValue={date} />
@@ -240,6 +263,7 @@ export default async function BookPage({
               <input key={id} type="hidden" name="service_id" value={id} />
             ))}
             <input type="hidden" name="date" value={date} />
+            <input type="hidden" name="people" value={partySize} />
             <input type="hidden" name="return_to" value={returnTo} />
             <input
               name="name"
@@ -314,6 +338,7 @@ export default async function BookPage({
           ))}
           <input type="hidden" name="date" value={date} />
           <input type="hidden" name="staff_id" value={staff_id ?? ""} />
+          <input type="hidden" name="people" value={partySize} />
           <input type="hidden" name="customer_id" value={identity.customerId} />
 
           {slots.length > 0 ? (
