@@ -10,7 +10,7 @@ import {
   CUSTOMER_COOKIE_MAX_AGE,
   signCustomerToken,
 } from "@/lib/customer-identity";
-import { pushLineMessage } from "@/lib/line";
+import { isNotificationOn, pushLineMessage } from "@/lib/line";
 import { clampPartySize, earliestBookingDate, monthlyOpenMaxDate, parseMonthlyOpen } from "@/lib/booking-window";
 
 const OPEN_HOUR = 11;
@@ -364,6 +364,7 @@ async function notifyOwnerOfNewBooking(
   note: string | null,
   partySize: number
 ) {
+  if (!(await isNotificationOn("notify_owner_new_booking"))) return;
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")

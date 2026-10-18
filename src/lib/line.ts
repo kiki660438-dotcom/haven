@@ -21,8 +21,33 @@ export async function pushLineMessage(lineUserId: string, text: string) {
   }
 }
 
-// 傳訊息給店主（在 LINE 傳「綁定管理員」的那個帳號）；還沒綁定就什麼都不做
-export async function notifyOwner(text: string) {
+// 推播有每月額度（免費方案 200 則），除了「確認／婉拒」之外的通知都要在「系統設定」手動打開才會送，預設是關的
+export async function isNotificationOn(key: string) {
+  const { data } = await supabase.from("app_settings").select("value").eq("key", key).maybeSingle();
+  return data?.value === "on";
+}
+
+// 這個月的推播額度與已使用量（查不到時回傳 null）
+export async function getPushQuota(): Promise<{ limit: number | null; used: number } | null> {
+  try {
+    const headers = { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` };
+    const [quotaRes, usedRes] = await Promise.all([
+      fetch(`${LINE_API}/quota`, { headers, cache: "no-store" }),
+      fetch(`${LINE_API}/quota/consumption`, { headers, cache: "no-store" }),
+    ]);
+    if (!quotaRes.ok || !usedRes.ok) return null;
+    const quota = await quotaRes.json();
+    const used = await usedRes.json();
+    return { limit: quota.type === "limited" ? quota.value : null, used: used.totalUsage };
+  } catch {
+    return null;
+  }
+}
+
+// 傳訊息給店主（在 LINE 傳「綁定管理員」的那個帳號）；還沒綁定就什麼都不做。
+// 帶 settingKey 時，對應的通知開關沒打開就不送
+export async function notifyOwner(text: string, settingKey?: string) {
+  if (settingKey && !(await isNotificationOn(settingKey))) return;
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")

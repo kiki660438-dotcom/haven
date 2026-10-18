@@ -34,3 +34,14 @@ export async function updateBookingWindow(formData: FormData) {
   revalidatePath("/book");
   redirect("/settings?success=1");
 }
+
+export async function updateNotifications(formData: FormData) {
+  const supabase = await createClient();
+  const keys = ["notify_owner_new_booking", "notify_owner_changes", "notify_customer_reminder"];
+  const rows = keys.map((key) => ({ key, value: formData.get(key) === "on" ? "on" : "off" }));
+  const { error } = await supabase.from("app_settings").upsert(rows);
+  if (error) throw new Error("儲存失敗：" + error.message);
+
+  revalidatePath("/settings");
+  redirect("/settings?success=1");
+}

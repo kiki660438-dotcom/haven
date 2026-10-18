@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { pushLineMessage } from "@/lib/line";
+import { isNotificationOn, pushLineMessage } from "@/lib/line";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  if (!(await isNotificationOn("notify_customer_reminder"))) {
+    return NextResponse.json({ ok: true, sent: 0, skipped: "reminders are off" });
   }
 
   const tomorrow = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(

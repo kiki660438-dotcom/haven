@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase-server";
 import { getMaxAdvanceBookingDate } from "../book/actions";
 import { parseMonthlyOpen } from "@/lib/booking-window";
-import { updateBookingWindow } from "./actions";
+import { updateBookingWindow, updateNotifications } from "./actions";
+import { getPushQuota } from "@/lib/line";
 
 function todayTaipei() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
@@ -20,14 +21,22 @@ export default async function SettingsPage({
   const { data } = await supabase
     .from("app_settings")
     .select("key, value")
-    .in("key", ["booking_open_until", "booking_monthly_open", "booking_max_advance_days"]);
+    .in("key", [
+      "booking_open_until",
+      "booking_monthly_open",
+      "booking_max_advance_days",
+      "notify_owner_new_booking",
+      "notify_owner_changes",
+      "notify_customer_reminder",
+    ]);
   const get = (k: string) => data?.find((r) => r.key === k)?.value ?? "";
 
   const fixed = /^\d{4}-\d{2}-\d{2}$/.test(get("booking_open_until")) ? get("booking_open_until") : "";
   const monthly = parseMonthlyOpen(get("booking_monthly_open"));
   const days = get("booking_max_advance_days") || "30";
   const mode = fixed ? "fixed" : monthly ? "monthly" : "rolling";
-  const maxDate = await getMaxAdvanceBookingDate();
+  const [maxDate, quota] = await Promise.all([getMaxAdvanceBookingDate(), getPushQuota()]);
+  const on = (k: string) => get(k) === "on";
 
   return (
     <main className="max-w-xl mx-auto p-8">
@@ -107,6 +116,58 @@ export default async function SettingsPage({
               className={`${field} w-20`}
             />
             天後
+          </span>
+        </label>
+
+        <button
+          type="submit"
+          className="bg-primary-dark text-white rounded-lg px-4 py-2 hover:bg-primary transition-colors self-start"
+        >
+          儲存
+        </button>
+      </form>
+
+      <form
+        action={updateNotifications}
+        className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white mt-6"
+      >
+        <h2 className="font-semibold">LINE 通知</h2>
+
+        <div className="p-3 rounded-lg bg-primary-light text-primary-dark text-sm">
+          {quota ? (
+            <>
+              本月推播已使用 <strong>{quota.used}</strong>
+              {quota.limit !== null ? ` / ${quota.limit}` : ""} 則
+              {quota.limit !== null && quota.used >= quota.limit && "（額度已用完，通知暫時送不出去，下個月 1 號恢復）"}
+            </>
+          ) : (
+            "目前查不到本月推播用量"
+          )}
+        </div>
+
+        <p className="text-sm text-foreground/70">
+          「確認預約」和「婉拒預約」通知客人，一定會送。下面的通知每一則都會用掉一則額度（免費方案每月 200 則），
+          用不夠的話可以先關掉，或到 LINE 後台升級方案。
+        </p>
+
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="notify_owner_new_booking" defaultChecked={on("notify_owner_new_booking")} className="mt-1" />
+          <span>
+            有新的線上預約時，通知我
+            <span className="block text-xs text-foreground/50">關閉時，請自己到「預約管理 → 待確認」查看</span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="notify_owner_changes" defaultChecked={on("notify_owner_changes")} className="mt-1" />
+          <span>客人改期或取消時，通知我</span>
+        </label>
+
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="notify_customer_reminder" defaultChecked={on("notify_customer_reminder")} className="mt-1" />
+          <span>
+            預約前一天，提醒客人
+            <span className="block text-xs text-foreground/50">每天早上 10 點，傳給明天有預約、且有綁定 LINE 的客人</span>
           </span>
         </label>
 

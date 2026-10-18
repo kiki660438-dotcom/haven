@@ -63,7 +63,8 @@ export async function cancelMyAppointment(appointmentId: string) {
     after(async () => {
       const { who, serviceNames } = await describeAppointment(identity.customerId, serviceIds);
       await notifyOwner(
-        `客人取消預約\n${who}\n原本時間：${formatTime(oldTime)}\n${serviceNames}`
+        `客人取消預約\n${who}\n原本時間：${formatTime(oldTime)}\n${serviceNames}`,
+        "notify_owner_changes"
       );
     });
   }
@@ -129,7 +130,8 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
   after(async () => {
     const { who, serviceNames } = await describeAppointment(identity.customerId, linkedServiceIds);
     await notifyOwner(
-      `客人改期（待確認）\n${who}\n原本：${formatTime(oldTime)}\n改到：${formatTime(start_time)}\n${serviceNames}\n請到後台確認`
+      `客人改期（待確認）\n${who}\n原本：${formatTime(oldTime)}\n改到：${formatTime(start_time)}\n${serviceNames}\n請到後台確認`,
+      "notify_owner_changes"
     );
   });
 
