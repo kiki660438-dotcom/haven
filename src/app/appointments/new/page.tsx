@@ -30,17 +30,48 @@ export default async function NewAppointmentPage({
     service_id?: string | string[];
     date?: string;
     staff_id?: string;
+    customer_id?: string;
   }>;
 }) {
-  const { error, service_id, date, staff_id } = await searchParams;
+  const { error, service_id, date, staff_id, customer_id } = await searchParams;
+  const customerId = customer_id ?? "";
   const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
 
   const supabase = await createClient();
-  const [{ data: allServices }, { data: staffList }, { data: customers }] = await Promise.all([
-    supabase.from("services").select("id, name, price, total_sessions").order("name"),
-    supabase.from("staff").select("id, name").eq("active", true).order("name"),
-    supabase.from("customers").select("id, name, phone").order("name"),
-  ]);
+  const [{ data: allServices }, { data: staffList }, { data: customers }, { data: voucherRows }] =
+    await Promise.all([
+      supabase.from("services").select("id, name, price, total_sessions").order("name"),
+      supabase.from("staff").select("id, name").eq("active", true).order("name"),
+      supabase.from("customers").select("id, name, phone").order("name"),
+      customerId
+        ? supabase
+            .from("vouchers")
+            .select("service_name, remaining_sessions")
+            .eq("customer_id", customerId)
+            .eq("status", "active")
+            .gt("remaining_sessions", 0)
+        : Promise.resolve({ data: [] as { service_name: string | null; remaining_sessions: number }[] }),
+    ]);
+
+  const selectedCustomer = customers?.find((c) => c.id === customerId);
+  const customerLabel = selectedCustomer
+    ? `${selectedCustomer.name}（${selectedCustomer.phone ?? ""}）`
+    : undefined;
+
+  // 客人已購買的商品券：同一種方案有多張時合併堂數，點選後預約的是該方案本身（開單時再「扣一堂」）
+  const packageByName = new Map((allServices ?? []).filter((s) => s.total_sessions).map((s) => [s.name, s]));
+  const voucherOptions = new Map<string, { id: string; name: string; remaining: number }>();
+  for (const v of voucherRows ?? []) {
+    const pkg = v.service_name ? packageByName.get(v.service_name) : undefined;
+    if (!pkg) continue;
+    const existing = voucherOptions.get(pkg.id);
+    voucherOptions.set(pkg.id, {
+      id: pkg.id,
+      name: pkg.name,
+      remaining: (existing?.remaining ?? 0) + v.remaining_sessions,
+    });
+  }
+  const vouchers = [...voucherOptions.values()];
 
   const services = (allServices ?? []).filter((s) => !s.total_sessions);
   const serviceGroups = groupServices(services);
@@ -78,11 +109,59 @@ export default async function NewAppointmentPage({
       <form
         method="GET"
         action="/appointments/new"
+        className="flex flex-col gap-3 p-5 border border-primary-light rounded-xl bg-white mb-6"
+      >
+        <p className="text-sm text-foreground/60">
+          先選客人，系統會自動列出他已購買的商品券。新客人或現場客可以略過這一步。
+        </p>
+        <CustomerPicker
+          customers={customers ?? []}
+          name="customer_id"
+          defaultCustomerId={customerId}
+          defaultLabel={customerLabel}
+        />
+        <button
+          type="submit"
+          className="bg-primary-light text-primary-dark rounded-lg px-4 py-2 hover:bg-primary/30 transition-colors"
+        >
+          選擇客人
+        </button>
+      </form>
+
+      <form
+        method="GET"
+        action="/appointments/new"
         className="flex flex-col gap-4 p-5 border border-primary-light rounded-xl bg-white mb-6"
       >
+        <input type="hidden" name="customer_id" value={customerId} />
         <div>
           <p className="text-sm mb-2 text-foreground/60">選擇服務 *（可複選）</p>
           <div className="flex flex-col gap-1 max-h-80 overflow-y-auto border border-primary-light rounded-lg p-2">
+            {customerId && (
+              <div className="mb-1">
+                <p className="text-xs text-foreground/50 px-2 py-1">
+                  {selectedCustomer?.name} 已購買的商品券（預約後開單再扣堂）
+                </p>
+                {vouchers.length === 0 && (
+                  <p className="text-xs text-foreground/40 px-2 pb-1">目前沒有可用的商品券</p>
+                )}
+                {vouchers.map((v) => (
+                  <label
+                    key={v.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer bg-primary-light/50 hover:bg-primary-light mb-1"
+                  >
+                    <input
+                      type="checkbox"
+                      name="service_id"
+                      value={v.id}
+                      defaultChecked={serviceIds.includes(v.id)}
+                    />
+                    {v.name}（剩 {v.remaining} 次）
+                  </label>
+                ))}
+                <hr className="border-primary-light my-1" />
+              </div>
+            )}
             {singleServiceGroups.map((g) => {
               const s = g.items[0];
               return (
@@ -177,7 +256,12 @@ export default async function NewAppointmentPage({
 
           <div>
             <p className="text-sm mb-2 text-foreground/60">客人</p>
-            <CustomerPicker customers={customers ?? []} name="customer_id" />
+            <CustomerPicker
+              customers={customers ?? []}
+              name="customer_id"
+              defaultCustomerId={customerId}
+              defaultLabel={customerLabel}
+            />
             <p className="text-xs text-foreground/50 mt-2 mb-1">如果上面沒選到人，請填新客人資料：</p>
             <div className="grid grid-cols-2 gap-2">
               <input

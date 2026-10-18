@@ -48,7 +48,12 @@ function dateHeading(key: string) {
   return `${key === todayKey() ? "今天・" : ""}${md}（${weekday}）`;
 }
 
-type ServiceRow = { name: string; price: number; buffer_minutes: number | null };
+type ServiceRow = {
+  name: string;
+  price: number;
+  total_sessions: number | null;
+  buffer_minutes: number | null;
+};
 
 export default async function AppointmentsPage({
   searchParams,
@@ -62,7 +67,7 @@ export default async function AppointmentsPage({
   const { data: appointments } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, buffer_minutes, party_size, note, customers(name, phone), staff(name), services(name, price, buffer_minutes), appointment_services(services(name, price, buffer_minutes))"
+      "id, start_time, status, buffer_minutes, party_size, note, customers(name, phone), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
     )
     .order("start_time", { ascending: true });
 
@@ -170,7 +175,9 @@ export default async function AppointmentsPage({
                   .filter((s): s is ServiceRow => !!s);
                 const single = Array.isArray(a.services) ? a.services[0] : a.services;
                 const services = linked.length > 0 ? linked : single ? [single] : [];
-                const totalPrice = services.reduce((sum, s) => sum + (s.price ?? 0), 0);
+                // 商品券方案（有堂數）是用既有堂數預約，不收費，不要把方案全額算進預約金額
+                const totalPrice = services.reduce((sum, s) => sum + (s.total_sessions ? 0 : s.price ?? 0), 0);
+                const usesVoucher = services.some((s) => s.total_sessions);
                 const maxServiceBuffer = services.reduce(
                   (max, s) => Math.max(max, s.buffer_minutes ?? 0),
                   0
@@ -222,7 +229,8 @@ export default async function AppointmentsPage({
                       )}
                     </p>
                     <p className="text-sm text-foreground/70">
-                      {services.map((s) => s.name).join("、")}（${totalPrice}）
+                      {services.map((s) => s.name).join("、")}
+                      {usesVoucher ? (totalPrice > 0 ? `（商品券＋$${totalPrice}）` : "（商品券）") : `（$${totalPrice}）`}
                     </p>
                     {a.note && (
                       <p className="text-xs text-foreground/50 mt-1">備註：{a.note}</p>

@@ -20,7 +20,7 @@ export async function createStaffAppointment(formData: FormData) {
   const bufferMinutesPart = Number(formData.get("buffer_minutes")) || 0;
   const buffer_minutes = bufferHours * 60 + bufferMinutesPart;
 
-  const query = `service_id=${service_ids.join(",")}&date=${date}&staff_id=${requestedStaffId ?? ""}`;
+  const query = `service_id=${service_ids.join(",")}&date=${date}&staff_id=${requestedStaffId ?? ""}&customer_id=${existingCustomerId}`;
 
   if (service_ids.length === 0 || !date || !time) {
     redirect(`/appointments/new?${query}&error=no_slot`);
