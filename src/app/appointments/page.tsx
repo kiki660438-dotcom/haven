@@ -67,9 +67,10 @@ export default async function AppointmentsPage({
   const { data: appointments } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, buffer_minutes, party_size, note, customers(name, phone), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
+      "id, start_time, created_at, status, buffer_minutes, party_size, note, customers(name, phone), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
     )
-    .order("start_time", { ascending: true });
+    .order("start_time", { ascending: true })
+    .order("created_at", { ascending: true });
 
   const today = todayKey();
   const pendingCount = appointments?.filter((a) => a.status === "pending").length ?? 0;
@@ -235,6 +236,9 @@ export default async function AppointmentsPage({
                     {a.note && (
                       <p className="text-xs text-foreground/50 mt-1">備註：{a.note}</p>
                     )}
+                    <p className="text-[11px] text-foreground/40 mt-1">
+                      建立時間 {toDateInputValue(a.created_at)} {toTimeInputValue(a.created_at)}
+                    </p>
 
                     <div className="flex flex-wrap items-center gap-2 mt-3">
                       {a.status === "pending" && (

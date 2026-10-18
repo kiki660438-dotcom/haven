@@ -71,7 +71,8 @@ export default async function DayPage({
     .neq("status", "cancelled")
     .gte("start_time", `${weekStart}T00:00:00+08:00`)
     .lt("start_time", `${addDays(weekStart, 7)}T00:00:00+08:00`)
-    .order("start_time", { ascending: true });
+    .order("start_time", { ascending: true })
+    .order("created_at", { ascending: true });
 
   const week = (data ?? []).map((a) => ({ ...a, dateKey: dateKeyOf(a.start_time) }));
   const countByDay = new Map<string, number>();
@@ -185,7 +186,7 @@ export default async function DayPage({
               <div className="flex-1 border-t border-primary-light" />
             </div>
             <div className="flex flex-col gap-3">
-              {list.map((a) => {
+              {list.map((a, order) => {
                 const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
                 const staff = Array.isArray(a.staff) ? a.staff[0] : a.staff;
                 const linked = (a.appointment_services ?? [])
@@ -211,12 +212,19 @@ export default async function DayPage({
                           </span>
                         )}
                       </p>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
-                          statusStyle[a.status] ?? "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {statusLabel[a.status] ?? a.status}
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        {list.length > 1 && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700 whitespace-nowrap">
+                            第 {order + 1} 位預約
+                          </span>
+                        )}
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                            statusStyle[a.status] ?? "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {statusLabel[a.status] ?? a.status}
+                        </span>
                       </span>
                     </div>
                     <p className="text-sm text-foreground/70 mt-1">
@@ -224,7 +232,7 @@ export default async function DayPage({
                       <span className="text-foreground/40">　約 {durationLabel(duration)}</span>
                     </p>
                     {a.note && <p className="text-xs text-foreground/50 mt-1">備註：{a.note}</p>}
-                    <p className="text-[11px] text-foreground/30 mt-1">
+                    <p className="text-[11px] text-foreground/40 mt-1">
                       建立時間 {dateKeyOf(a.created_at)} {timeOf(a.created_at)}
                     </p>
 
