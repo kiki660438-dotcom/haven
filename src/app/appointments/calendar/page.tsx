@@ -82,13 +82,23 @@ export default async function AppointmentsCalendarPage({
   );
   const gridEnd = cells[cells.length - 1];
 
+  const gridStartKey = dateKey(gridStart.year, gridStart.month, gridStart.day);
+  const gridEndKey = dateKey(gridEnd.year, gridEnd.month, gridEnd.day);
+
   const supabase = await createClient();
-  const { data: appointments } = await supabase
-    .from("appointments")
-    .select("id, start_time, status, customers(name), staff(name)")
-    .gte("start_time", `${dateKey(gridStart.year, gridStart.month, gridStart.day)}T00:00:00+08:00`)
-    .lte("start_time", `${dateKey(gridEnd.year, gridEnd.month, gridEnd.day)}T23:59:59+08:00`)
-    .order("start_time", { ascending: true });
+  const [{ data: appointments }, { data: leaves }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select("id, start_time, status, customers(name), staff(name)")
+      .gte("start_time", `${gridStartKey}T00:00:00+08:00`)
+      .lte("start_time", `${gridEndKey}T23:59:59+08:00`)
+      .order("start_time", { ascending: true }),
+    supabase
+      .from("staff_leave")
+      .select("start_date, end_date, all_day, start_time, end_time")
+      .lte("start_date", gridEndKey)
+      .gte("end_date", gridStartKey),
+  ]);
 
   const byDay = new Map<string, ApptRow[]>();
   for (const a of ((appointments ?? []) as ApptRow[]).filter((x) => x.status !== "cancelled")) {
@@ -105,8 +115,8 @@ export default async function AppointmentsCalendarPage({
   const todayKey = dateKey(today.year, today.month, today.day);
 
   return (
-    <main className="max-w-5xl mx-auto p-8">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+    <main className="max-w-5xl mx-auto px-1 py-4 sm:p-8">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3 px-3 sm:px-0">
         <h1 className="text-2xl font-bold text-primary-dark">預約月曆</h1>
         <Link
           href="/appointments"
@@ -116,7 +126,7 @@ export default async function AppointmentsCalendarPage({
         </Link>
       </div>
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 px-1 sm:px-0">
         <Link
           href={`/appointments/calendar?month=${prevMonth.year}-${pad(prevMonth.month)}`}
           className="p-2 rounded-full hover:bg-primary-light text-primary-dark"
@@ -140,7 +150,7 @@ export default async function AppointmentsCalendarPage({
         </Link>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-xs text-foreground/50 mb-1">
+      <div className="grid grid-cols-7 gap-px sm:gap-1 text-center text-xs text-foreground/50 mb-1">
         {WEEKDAYS.map((w) => (
           <div key={w} className="py-1">
             {w}
@@ -148,7 +158,7 @@ export default async function AppointmentsCalendarPage({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-px sm:gap-1 bg-primary-light/70 sm:bg-transparent border-y border-primary-light/70 sm:border-0">
         {cells.map((c) => {
           const key = dateKey(c.year, c.month, c.day);
           const inMonth = c.month === month;
@@ -156,15 +166,16 @@ export default async function AppointmentsCalendarPage({
           const dayAppointments = byDay.get(key) ?? [];
           const shown = dayAppointments.slice(0, MAX_CHIPS_PER_DAY);
           const extra = dayAppointments.length - shown.length;
+          const dayLeaves = (leaves ?? []).filter((l) => key >= l.start_date && key <= l.end_date);
 
           return (
             <Link
               key={key}
               href={`/appointments/day?date=${key}`}
-              className={`min-h-24 sm:min-h-28 p-1 sm:p-1.5 rounded-lg border text-left flex flex-col gap-1 transition-colors ${
+              className={`min-h-24 sm:min-h-28 p-0.5 sm:p-1.5 sm:rounded-lg sm:border text-left flex flex-col gap-0.5 sm:gap-1 transition-colors ${
                 inMonth
-                  ? "bg-white border-primary-light hover:bg-primary-light/40"
-                  : "bg-gray-50 border-gray-100 text-foreground/30 hover:bg-gray-100"
+                  ? `${isToday ? "bg-primary-light/50" : "bg-white"} sm:border-primary-light hover:bg-primary-light/40`
+                  : "bg-gray-50 sm:border-gray-100 text-foreground/30 hover:bg-gray-100"
               }`}
             >
               <span
@@ -174,14 +185,25 @@ export default async function AppointmentsCalendarPage({
               >
                 {c.day}
               </span>
-              {/* 手機版格子很窄，只放姓名（依狀態上色）；桌機顯示時間＋姓名 */}
+              {dayLeaves.map((l, i) => (
+                <span
+                  key={`leave-${i}`}
+                  className="block rounded px-0.5 text-[11px] leading-[14px] bg-sky-100 text-sky-700 sm:truncate"
+                >
+                  排休
+                  {!l.all_day && l.start_time && l.end_time
+                    ? ` ${l.start_time.slice(0, 5)}-${l.end_time.slice(0, 5)}`
+                    : ""}
+                </span>
+              ))}
+              {/* 手機版：格子貼滿畫面、姓名完整顯示（依狀態上色）；桌機顯示時間＋姓名 */}
               <div className="flex sm:hidden flex-col gap-0.5">
-                {shown.map((a) => {
+                {dayAppointments.map((a) => {
                   const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
                   return (
                     <span
                       key={a.id}
-                      className={`block truncate rounded px-0.5 text-[10px] leading-4 ${
+                      className={`block break-all rounded px-0.5 text-[11px] leading-[14px] ${
                         statusChip[a.status] ?? "bg-gray-100 text-gray-600"
                       }`}
                     >
@@ -189,9 +211,6 @@ export default async function AppointmentsCalendarPage({
                     </span>
                   );
                 })}
-                {extra > 0 && (
-                  <span className="text-[10px] text-foreground/40 leading-none">+{extra}</span>
-                )}
               </div>
               <div className="hidden sm:flex flex-col gap-0.5">
                 {shown.map((a) => {
