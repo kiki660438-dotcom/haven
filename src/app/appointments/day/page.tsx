@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "../actions";
+import CopyMessageButton from "../CopyMessageButton";
+import { getLineDisplayName } from "@/lib/line";
 import { Check, ChevronLeft, ChevronRight, ShoppingCart, List } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -66,7 +68,7 @@ export default async function DayPage({
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, note, created_at, party_size, customers(name, phone), staff(name), services(name, price, duration_minutes), appointment_services(services(name, price, duration_minutes))"
+      "id, start_time, status, note, created_at, party_size, customers(name, phone, line_user_id), staff(name), services(name, price, duration_minutes), appointment_services(services(name, price, duration_minutes))"
     )
     .neq("status", "cancelled")
     .gte("start_time", `${weekStart}T00:00:00+08:00`)
@@ -86,6 +88,17 @@ export default async function DayPage({
     day: "numeric",
     weekday: "short",
   }).format(new Date(`${date}T00:00:00+08:00`));
+
+  const lineIds = [
+    ...new Set(
+      dayList
+        .map((a) => (Array.isArray(a.customers) ? a.customers[0] : a.customers)?.line_user_id)
+        .filter((id): id is string => !!id)
+    ),
+  ];
+  const lineNames = new Map(
+    await Promise.all(lineIds.map(async (id) => [id, await getLineDisplayName(id)] as const))
+  );
 
   const byTime = new Map<string, typeof dayList>();
   for (const a of dayList) {
@@ -203,6 +216,15 @@ export default async function DayPage({
                       <p className="font-semibold">
                         {customer?.name}
                         <span className="font-normal text-xs text-foreground/50 ml-2">{customer?.phone}</span>
+                        {customer?.line_user_id ? (
+                          <span className="font-normal text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-2">
+                            LINE：{lineNames.get(customer.line_user_id) ?? "（查不到暱稱）"}
+                          </span>
+                        ) : (
+                          <span className="font-normal text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 ml-2">
+                            未綁定 LINE，請用電話聯絡
+                          </span>
+                        )}
                         {staff?.name && (
                           <span className="font-normal text-xs text-primary-dark ml-2">指定 {staff.name}</span>
                         )}
@@ -244,6 +266,8 @@ export default async function DayPage({
                           </button>
                         </form>
                       )}
+                      <CopyMessageButton kind="confirm" name={customer?.name ?? ""} startIso={a.start_time} />
+                      <CopyMessageButton kind="decline" name={customer?.name ?? ""} startIso={a.start_time} />
                       <Link
                         href={`/checkout?appointment=${a.id}`}
                         className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"

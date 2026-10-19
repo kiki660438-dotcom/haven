@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
+import CopyMessageButton from "./CopyMessageButton";
+import { getLineDisplayName } from "@/lib/line";
 import { Check, X, ShoppingCart, ChevronDown, Calendar, CalendarSearch, Plus } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -67,7 +69,7 @@ export default async function AppointmentsPage({
   const { data: appointments } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, created_at, status, buffer_minutes, party_size, note, customers(name, phone), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
+      "id, start_time, created_at, status, buffer_minutes, party_size, note, customers(name, phone, line_user_id), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
     )
     .order("start_time", { ascending: true })
     .order("created_at", { ascending: true });
@@ -90,6 +92,18 @@ export default async function AppointmentsPage({
     if (activeFilter === "all") return true;
     return a.dateKey >= today;
   });
+
+  // 客人在 LINE 聊天室裡顯示的是 LINE 暱稱，不是他留的姓名，所以把暱稱一起列出來方便對照
+  const lineIds = [
+    ...new Set(
+      filtered
+        .map((a) => (Array.isArray(a.customers) ? a.customers[0] : a.customers)?.line_user_id)
+        .filter((id): id is string => !!id)
+    ),
+  ].slice(0, 60);
+  const lineNames = new Map(
+    await Promise.all(lineIds.map(async (id) => [id, await getLineDisplayName(id)] as const))
+  );
 
   const groups = new Map<string, typeof filtered>();
   for (const a of filtered) {
@@ -218,6 +232,15 @@ export default async function AppointmentsPage({
                       <span className="font-normal text-xs text-foreground/50 ml-2">
                         {customer?.phone}
                       </span>
+                      {customer?.line_user_id ? (
+                        <span className="font-normal text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-2">
+                          LINE：{lineNames.get(customer.line_user_id) ?? "（查不到暱稱，可能尚未加好友）"}
+                        </span>
+                      ) : (
+                        <span className="font-normal text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 ml-2">
+                          未綁定 LINE，請用電話聯絡
+                        </span>
+                      )}
                       {staff?.name && (
                         <span className="font-normal text-xs text-primary-dark ml-2">
                           指定 {staff.name}
@@ -266,6 +289,12 @@ export default async function AppointmentsPage({
                               <X size={14} /> 婉拒預約
                             </button>
                           </form>
+                        </>
+                      )}
+                      {(a.status === "pending" || a.status === "confirmed") && (
+                        <>
+                          <CopyMessageButton kind="confirm" name={customer?.name ?? ""} startIso={a.start_time} />
+                          <CopyMessageButton kind="decline" name={customer?.name ?? ""} startIso={a.start_time} />
                         </>
                       )}
                       {a.status !== "cancelled" && (
