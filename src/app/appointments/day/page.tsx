@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "../actions";
 import { getLineDisplayName } from "@/lib/line";
-import { Check, ChevronLeft, ChevronRight, ShoppingCart, List } from "lucide-react";
+import { confirmMessage, smsLink } from "@/lib/messages";
+import { Check, ChevronLeft, ChevronRight, ShoppingCart, List, MessageSquare } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -270,6 +271,14 @@ export default async function DayPage({
                             <Check size={14} /> 確認
                           </button>
                         </form>
+                      )}
+                      {a.status === "confirmed" && !customer?.line_user_id && customer?.phone && (
+                        <a
+                          href={smsLink(customer.phone, confirmMessage(customer.name ?? "", a.start_time))}
+                          className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
+                        >
+                          <MessageSquare size={14} /> 傳簡訊通知
+                        </a>
                       )}
                       <Link
                         href={`/checkout?appointment=${a.id}`}

@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
 import { getLineDisplayName } from "@/lib/line";
+import { confirmMessage, smsLink } from "@/lib/messages";
+import { MessageSquare } from "lucide-react";
 import { Check, X, ShoppingCart, ChevronDown, Calendar, CalendarSearch, Plus } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -295,6 +297,14 @@ export default async function AppointmentsPage({
                             </button>
                           </form>
                         </>
+                      )}
+                      {a.status === "confirmed" && !customer?.line_user_id && customer?.phone && (
+                        <a
+                          href={smsLink(customer.phone, confirmMessage(customer.name ?? "", a.start_time))}
+                          className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
+                        >
+                          <MessageSquare size={14} /> 傳簡訊通知
+                        </a>
                       )}
                       {a.status !== "cancelled" && (
                         <Link
