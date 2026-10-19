@@ -106,6 +106,18 @@ export default async function BookPage({
         <div className="p-6 rounded-xl bg-primary-light text-primary-dark text-center">
           <p className="text-lg font-semibold mb-2">預約已送出 🎉</p>
           <p className="text-sm">我們會盡快與您確認，請耐心等候設計師確認通知。</p>
+          <div className="mt-4 p-3 rounded-lg bg-white/70 text-left text-sm">
+            <p className="font-medium mb-1">想收到預約確認通知？</p>
+            <p className="text-foreground/70">
+              請加入 Haven Hair 官方 LINE，並傳送您預約時留的<strong>手機號碼</strong>給我們，確認後會從 LINE 通知您。
+            </p>
+            <a
+              href="https://line.me/R/ti/p/@558ekdgz"
+              className="inline-block mt-2 px-3 py-1.5 rounded-lg bg-primary-dark text-white text-sm"
+            >
+              加入官方 LINE
+            </a>
+          </div>
           <a href="/my" className="inline-block mt-4 text-sm underline">
             查看我的預約／商品券
           </a>

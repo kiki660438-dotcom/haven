@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "../actions";
-import CopyMessageButton from "../CopyMessageButton";
 import { getLineDisplayName } from "@/lib/line";
 import { Check, ChevronLeft, ChevronRight, ShoppingCart, List } from "lucide-react";
 
@@ -68,7 +67,7 @@ export default async function DayPage({
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, status, note, created_at, party_size, customers(name, phone, line_user_id), staff(name), services(name, price, duration_minutes), appointment_services(services(name, price, duration_minutes))"
+      "id, customer_id, start_time, status, note, created_at, party_size, customers(name, phone, line_user_id), staff(name), services(name, price, duration_minutes), appointment_services(services(name, price, duration_minutes))"
     )
     .neq("status", "cancelled")
     .gte("start_time", `${weekStart}T00:00:00+08:00`)
@@ -214,7 +213,13 @@ export default async function DayPage({
                   <div key={a.id} className="p-4 border border-primary-light rounded-xl bg-white">
                     <div className="flex items-start justify-between gap-3">
                       <p className="font-semibold">
-                        {customer?.name}
+                        {a.customer_id ? (
+                          <Link href={`/members/${a.customer_id}`} className="underline decoration-dotted underline-offset-2 hover:text-primary-dark">
+                            {customer?.name}
+                          </Link>
+                        ) : (
+                          customer?.name
+                        )}
                         <span className="font-normal text-xs text-foreground/50 ml-2">{customer?.phone}</span>
                         {customer?.line_user_id ? (
                           <span className="font-normal text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-2">
@@ -266,8 +271,6 @@ export default async function DayPage({
                           </button>
                         </form>
                       )}
-                      <CopyMessageButton kind="confirm" name={customer?.name ?? ""} startIso={a.start_time} />
-                      <CopyMessageButton kind="decline" name={customer?.name ?? ""} startIso={a.start_time} />
                       <Link
                         href={`/checkout?appointment=${a.id}`}
                         className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-primary-light text-primary-dark hover:bg-primary-light transition-colors"

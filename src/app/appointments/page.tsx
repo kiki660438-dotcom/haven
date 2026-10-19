@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
-import CopyMessageButton from "./CopyMessageButton";
 import { getLineDisplayName } from "@/lib/line";
 import { Check, X, ShoppingCart, ChevronDown, Calendar, CalendarSearch, Plus } from "lucide-react";
 
@@ -69,7 +68,7 @@ export default async function AppointmentsPage({
   const { data: appointments } = await supabase
     .from("appointments")
     .select(
-      "id, start_time, created_at, status, buffer_minutes, party_size, note, customers(name, phone, line_user_id), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
+      "id, customer_id, start_time, created_at, status, buffer_minutes, party_size, note, customers(name, phone, line_user_id), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
     )
     .order("start_time", { ascending: true })
     .order("created_at", { ascending: true });
@@ -228,7 +227,13 @@ export default async function AppointmentsPage({
                     </div>
 
                     <p className="font-semibold mt-1">
-                      {customer?.name}
+                      {a.customer_id ? (
+                        <Link href={`/members/${a.customer_id}`} className="underline decoration-dotted underline-offset-2 hover:text-primary-dark">
+                          {customer?.name}
+                        </Link>
+                      ) : (
+                        customer?.name
+                      )}
                       <span className="font-normal text-xs text-foreground/50 ml-2">
                         {customer?.phone}
                       </span>
@@ -289,12 +294,6 @@ export default async function AppointmentsPage({
                               <X size={14} /> 婉拒預約
                             </button>
                           </form>
-                        </>
-                      )}
-                      {(a.status === "pending" || a.status === "confirmed") && (
-                        <>
-                          <CopyMessageButton kind="confirm" name={customer?.name ?? ""} startIso={a.start_time} />
-                          <CopyMessageButton kind="decline" name={customer?.name ?? ""} startIso={a.start_time} />
                         </>
                       )}
                       {a.status !== "cancelled" && (

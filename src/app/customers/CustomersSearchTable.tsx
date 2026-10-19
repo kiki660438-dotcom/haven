@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { deleteCustomer, updateCustomerDemographics } from "./actions";
@@ -54,7 +55,11 @@ export default function CustomersSearchTable({ customers }: { customers: Custome
           <tbody>
             {filtered.map((c) => (
               <tr key={c.id} className="border-b border-primary-light/60">
-                <td className="py-2 px-3">{c.name}</td>
+                <td className="py-2 px-3">
+                  <Link href={`/members/${c.id}`} className="underline decoration-dotted underline-offset-2 hover:text-primary-dark">
+                    {c.name}
+                  </Link>
+                </td>
                 <td className="px-3">{c.phone}</td>
                 <td className="px-3">{c.email}</td>
                 <td className="px-3">{c.note}</td>

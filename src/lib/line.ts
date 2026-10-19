@@ -28,7 +28,9 @@ export async function isNotificationOn(key: string) {
 }
 
 // 查客人的 LINE 暱稱（要對方是官方帳號的好友才查得到）；這個 API 不佔推播額度，結果快取一天
-export async function getLineDisplayName(lineUserId: string): Promise<string | null> {
+export async function getLineProfile(
+  lineUserId: string
+): Promise<{ displayName: string; pictureUrl: string | null } | null> {
   try {
     const res = await fetch(`https://api.line.me/v2/bot/profile/${lineUserId}`, {
       headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
@@ -36,10 +38,14 @@ export async function getLineDisplayName(lineUserId: string): Promise<string | n
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.displayName ?? null;
+    return data.displayName ? { displayName: data.displayName, pictureUrl: data.pictureUrl ?? null } : null;
   } catch {
     return null;
   }
+}
+
+export async function getLineDisplayName(lineUserId: string): Promise<string | null> {
+  return (await getLineProfile(lineUserId))?.displayName ?? null;
 }
 
 // 這個月的推播額度與已使用量（查不到時回傳 null）
