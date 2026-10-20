@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "../actions";
-import { getLineDisplayName, lineChatUrl } from "@/lib/line";
+import { getLineDisplayName } from "@/lib/line";
 import LineReplyButton from "../LineReplyButton";
 import { confirmMessage, smsLink } from "@/lib/messages";
 import { Check, ChevronLeft, ChevronRight, ShoppingCart, List, MessageSquare } from "lucide-react";
@@ -275,7 +275,6 @@ export default async function DayPage({
                       )}
                       {a.status === "confirmed" && customer?.line_user_id && (
                         <LineReplyButton
-                          chatUrl={lineChatUrl(customer.line_user_id)}
                           nickname={lineNames.get(customer.line_user_id) ?? null}
                           text={confirmMessage(customer.name ?? "", a.start_time)}
                         />

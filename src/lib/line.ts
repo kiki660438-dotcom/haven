@@ -48,13 +48,6 @@ export async function getLineDisplayName(lineUserId: string): Promise<string | n
   return (await getLineProfile(lineUserId))?.displayName ?? null;
 }
 
-// 官方帳號在「LINE 後台聊天室」網址裡的代號（chat.line.biz/<這個代號>/chat/<客人的 userId>），是固定的，不是機密
-const LINE_OA_CHAT_ID = "U5cc0e3b2b46f31e1aa7df3e925504441";
-
-export function lineChatUrl(customerLineUserId: string) {
-  return `https://chat.line.biz/${LINE_OA_CHAT_ID}/chat/${customerLineUserId}`;
-}
-
 // 這個月的推播額度與已使用量（查不到時回傳 null）
 export async function getPushQuota(): Promise<{ limit: number | null; used: number } | null> {
   try {

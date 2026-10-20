@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
-import { getLineDisplayName, lineChatUrl } from "@/lib/line";
+import { getLineDisplayName } from "@/lib/line";
 import LineReplyButton from "./LineReplyButton";
 import { confirmMessage, smsLink } from "@/lib/messages";
 import { MessageSquare } from "lucide-react";
@@ -301,7 +301,6 @@ export default async function AppointmentsPage({
                       )}
                       {a.status === "confirmed" && customer?.line_user_id && (
                         <LineReplyButton
-                          chatUrl={lineChatUrl(customer.line_user_id)}
                           nickname={lineNames.get(customer.line_user_id) ?? null}
                           text={confirmMessage(customer.name ?? "", a.start_time)}
                         />
