@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "../actions";
-import { getBotUserId, getLineDisplayName } from "@/lib/line";
+import { getLineDisplayName, lineChatUrl } from "@/lib/line";
 import LineReplyButton from "../LineReplyButton";
 import { confirmMessage, smsLink } from "@/lib/messages";
 import { Check, ChevronLeft, ChevronRight, ShoppingCart, List, MessageSquare } from "lucide-react";
@@ -97,7 +97,6 @@ export default async function DayPage({
         .filter((id): id is string => !!id)
     ),
   ];
-  const botUserId = await getBotUserId();
   const lineNames = new Map(
     await Promise.all(lineIds.map(async (id) => [id, await getLineDisplayName(id)] as const))
   );
@@ -274,9 +273,9 @@ export default async function DayPage({
                           </button>
                         </form>
                       )}
-                      {a.status === "confirmed" && customer?.line_user_id && botUserId && (
+                      {a.status === "confirmed" && customer?.line_user_id && (
                         <LineReplyButton
-                          chatUrl={`https://chat.line.biz/${botUserId}/chat/${customer.line_user_id}`}
+                          chatUrl={lineChatUrl(customer.line_user_id)}
                           text={confirmMessage(customer.name ?? "", a.start_time)}
                         />
                       )}
