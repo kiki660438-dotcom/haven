@@ -48,6 +48,20 @@ export async function getLineDisplayName(lineUserId: string): Promise<string | n
   return (await getLineProfile(lineUserId))?.displayName ?? null;
 }
 
+// 官方帳號自己的 userId，用來組出「某位客人的 LINE 後台聊天室」網址（結果快取一天）
+export async function getBotUserId(): Promise<string | null> {
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/info", {
+      headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return null;
+    return (await res.json()).userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // 這個月的推播額度與已使用量（查不到時回傳 null）
 export async function getPushQuota(): Promise<{ limit: number | null; used: number } | null> {
   try {

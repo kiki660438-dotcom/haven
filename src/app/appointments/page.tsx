@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import UpdateTimeForm from "./UpdateTimeForm";
-import { getLineDisplayName } from "@/lib/line";
+import { getBotUserId, getLineDisplayName } from "@/lib/line";
+import LineReplyButton from "./LineReplyButton";
 import { confirmMessage, smsLink } from "@/lib/messages";
 import { MessageSquare } from "lucide-react";
 import { Check, X, ShoppingCart, ChevronDown, Calendar, CalendarSearch, Plus } from "lucide-react";
@@ -102,6 +103,7 @@ export default async function AppointmentsPage({
         .filter((id): id is string => !!id)
     ),
   ].slice(0, 60);
+  const botUserId = await getBotUserId();
   const lineNames = new Map(
     await Promise.all(lineIds.map(async (id) => [id, await getLineDisplayName(id)] as const))
   );
@@ -297,6 +299,12 @@ export default async function AppointmentsPage({
                             </button>
                           </form>
                         </>
+                      )}
+                      {a.status === "confirmed" && customer?.line_user_id && botUserId && (
+                        <LineReplyButton
+                          chatUrl={`https://chat.line.biz/${botUserId}/chat/${customer.line_user_id}`}
+                          text={confirmMessage(customer.name ?? "", a.start_time)}
+                        />
                       )}
                       {a.status === "confirmed" && !customer?.line_user_id && customer?.phone && (
                         <a
