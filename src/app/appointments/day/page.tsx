@@ -276,6 +276,7 @@ export default async function DayPage({
                       {a.status === "confirmed" && customer?.line_user_id && (
                         <LineReplyButton
                           chatUrl={lineChatUrl(customer.line_user_id)}
+                          nickname={lineNames.get(customer.line_user_id) ?? null}
                           text={confirmMessage(customer.name ?? "", a.start_time)}
                         />
                       )}
