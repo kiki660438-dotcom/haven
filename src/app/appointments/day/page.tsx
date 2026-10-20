@@ -280,7 +280,7 @@ export default async function DayPage({
                           text={confirmMessage(customer.name ?? "", a.start_time)}
                         />
                       )}
-                      {a.status === "confirmed" && !customer?.line_user_id && customer?.phone && (
+                      {a.status === "confirmed" && customer?.phone && (
                         <a
                           href={smsLink(customer.phone, confirmMessage(customer.name ?? "", a.start_time))}
                           className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
