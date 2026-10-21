@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       .eq("status", "pending"),
     supabase
       .from("orders")
-      .select("total, status")
+      .select("total, status, payment_method")
       .gte("created_at", start)
       .lte("created_at", end),
   ]);
@@ -54,11 +54,19 @@ export default async function DashboardPage() {
       ?.filter((o) => o.status === "paid")
       .reduce((sum, o) => sum + o.total, 0) ?? 0;
 
+  const paidToday = todayOrders?.filter((o) => o.status === "paid") ?? [];
+  const todayCash = paidToday.filter((o) => o.payment_method === "cash").reduce((sum, o) => sum + o.total, 0);
+  const todayTransfer = paidToday
+    .filter((o) => o.payment_method === "transfer")
+    .reduce((sum, o) => sum + o.total, 0);
+
   const cards = [
     { label: "今日預約", value: todayAppointmentList?.length ?? 0 },
     { label: "待確認預約", value: pendingAppointments ?? 0 },
     { label: "今日開單數", value: todayOrderCount },
-    { label: "今日營業額", value: `$${todayRevenue}` },
+    { label: "今日營業額", value: `$${todayRevenue.toLocaleString()}` },
+    { label: "今日現金", value: `$${todayCash.toLocaleString()}` },
+    { label: "今日匯款", value: `$${todayTransfer.toLocaleString()}` },
   ];
 
   return (
@@ -66,7 +74,7 @@ export default async function DashboardPage() {
       <h1 className="text-2xl font-bold text-primary-dark mb-1">營業總覽</h1>
       <p className="text-sm text-foreground/50 mb-6">{dateStr}</p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
         {cards.map((c) => (
           <div
             key={c.label}
