@@ -103,6 +103,12 @@ export async function rescheduleMyAppointment(appointmentId: string, formData: F
   const linkedServiceIds = appointment.appointment_services?.length
     ? appointment.appointment_services.map((row) => row.service_id)
     : [appointment.service_id];
+  // 客人只能改到 11:00～18:00 之間（10 點是店長專用的時段）
+  const [hh, mm] = time.split(":").map(Number);
+  if (!(hh * 60 + mm >= 11 * 60 && hh * 60 + mm <= 18 * 60)) {
+    redirect(`/my?reschedule=${appointmentId}&r_date=${date}&error=no_slot`);
+  }
+
   const { duration, maxBuffer } = await getServicesDuration(linkedServiceIds);
   const durationMs = (duration * (appointment.party_size ?? 1) + maxBuffer) * 60_000;
   const start_time = `${date}T${time}:00+08:00`;

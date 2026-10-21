@@ -15,6 +15,8 @@ import { clampPartySize, earliestBookingDate, monthlyOpenMaxDate, parseMonthlyOp
 
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 18;
+// 後台代客預約可以排的最早時間（10 點只有店長自己能排，客人預約頁不開放）
+const STAFF_OPEN_HOUR = 10;
 const SLOT_STEP_MINUTES = 30;
 
 type BusyInterval = { start: number; end: number };
@@ -288,7 +290,7 @@ export async function getStaffSlots(serviceIds: string[], date: string, staffId?
   const durationMs = (duration + maxBuffer) * 60_000;
   const busy = await getBusyIntervals(date, staffId || null);
 
-  const dayOpen = new Date(`${date}T${String(OPEN_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
+  const dayOpen = new Date(`${date}T${String(STAFF_OPEN_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
   const dayClose = new Date(`${date}T${String(CLOSE_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
 
   const slots: { time: string; busy: boolean }[] = [];
@@ -439,6 +441,12 @@ export async function createBooking(formData: FormData) {
 
   const start_time = `${date}T${time}:00+08:00`;
   const startMs = new Date(start_time).getTime();
+  // 客人只能約營業時間內的時段（10 點是店長專用），擋掉自己改網址硬約的情況
+  const openMs = new Date(`${date}T${String(OPEN_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
+  const closeMs = new Date(`${date}T${String(CLOSE_HOUR).padStart(2, "0")}:00:00+08:00`).getTime();
+  if (!(startMs >= openMs && startMs <= closeMs)) {
+    redirect(`/book?${query}&error=no_slot`);
+  }
   const durationMs = (duration * partySize + maxBuffer) * 60_000;
 
   const { ok, staffId } = await findAvailableStaff(date, startMs, startMs + durationMs, requestedStaffId);
