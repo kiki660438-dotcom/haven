@@ -129,3 +129,54 @@ export async function updateAppointmentTime(
   revalidatePath("/dashboard");
   return { ok: true };
 }
+
+export type UpdateDetailsState = { ok: boolean; error?: string } | null;
+
+// 月曆小視窗裡的「編輯預約」：一次改時間、服務項目、緩衝時間、備註。
+// 後台自己改，不檢查時段衝突（跟後台代客預約一樣，店長自己評估），也不傳訊息給客人
+export async function updateAppointmentDetails(
+  id: string,
+  _prev: UpdateDetailsState,
+  formData: FormData
+): Promise<UpdateDetailsState> {
+  const supabase = await createClient();
+  const date = formData.get("date") as string;
+  const time = formData.get("time") as string;
+  const serviceIds = [...new Set(formData.getAll("service_id") as string[])];
+  const note = ((formData.get("note") as string) || "").trim() || null;
+  const buffer_minutes =
+    (Math.max(0, Number(formData.get("buffer_hours")) || 0)) * 60 +
+    Math.min(59, Math.max(0, Number(formData.get("buffer_minutes")) || 0));
+
+  if (!date || !time) return { ok: false, error: "請填寫日期與時間" };
+  if (serviceIds.length === 0) return { ok: false, error: "請至少選擇一項服務" };
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      start_time: `${date}T${time}:00+08:00`,
+      buffer_minutes,
+      service_id: serviceIds[0],
+      note,
+    })
+    .eq("id", id);
+  if (error) {
+    console.error("updateAppointmentDetails failed", error);
+    return { ok: false, error: `更新失敗：${error.message}` };
+  }
+
+  // 多項服務存在 appointment_services，單一項目只用 service_id，沿用既有的存法
+  await supabase.from("appointment_services").delete().eq("appointment_id", id);
+  if (serviceIds.length > 1) {
+    const { error: linkError } = await supabase
+      .from("appointment_services")
+      .insert(serviceIds.map((service_id) => ({ appointment_id: id, service_id })));
+    if (linkError) return { ok: false, error: `服務項目更新失敗：${linkError.message}` };
+  }
+
+  revalidatePath("/appointments");
+  revalidatePath("/appointments/calendar");
+  revalidatePath("/dashboard");
+  revalidatePath("/book");
+  return { ok: true };
+}

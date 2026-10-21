@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { ChevronLeft, ChevronRight, List } from "lucide-react";
 import MonthGrid, { type DayCell, type ApptInfo } from "./MonthGrid";
+import type { ServiceOption } from "./AppointmentEditor";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -35,7 +36,7 @@ function dateKey(year: number, month: number, day: number) {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
-type Named = { name: string } | { name: string }[] | null;
+type Named = { id?: string; name: string; buffer_minutes?: number | null } | { id?: string; name: string; buffer_minutes?: number | null }[] | null;
 type ApptRow = {
   id: string;
   customer_id: string | null;
@@ -43,9 +44,11 @@ type ApptRow = {
   status: string;
   party_size: number | null;
   note: string | null;
+  buffer_minutes: number | null;
+  service_id: string | null;
   customers: { name: string; phone: string | null } | { name: string; phone: string | null }[] | null;
   services: Named;
-  appointment_services: { services: Named }[] | null;
+  appointment_services: { service_id: string; services: Named }[] | null;
 };
 
 const first = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
@@ -80,11 +83,11 @@ export default async function AppointmentsCalendarPage({
   const gridEndKey = dateKey(gridEnd.year, gridEnd.month, gridEnd.day);
 
   const supabase = await createClient();
-  const [{ data: appointments }, { data: leaves }] = await Promise.all([
+  const [{ data: appointments }, { data: leaves }, { data: serviceRows }] = await Promise.all([
     supabase
       .from("appointments")
       .select(
-        "id, customer_id, start_time, status, party_size, note, customers(name, phone), services(name), appointment_services(services(name))"
+        "id, customer_id, start_time, status, party_size, note, buffer_minutes, service_id, customers(name, phone), services(id, name, buffer_minutes), appointment_services(service_id, services(id, name, buffer_minutes))"
       )
       .gte("start_time", `${gridStartKey}T00:00:00+08:00`)
       .lte("start_time", `${gridEndKey}T23:59:59+08:00`)
@@ -94,6 +97,7 @@ export default async function AppointmentsCalendarPage({
       .select("start_date, end_date, all_day, start_time, end_time")
       .lte("start_date", gridEndKey)
       .gte("end_date", gridStartKey),
+    supabase.from("services").select("id, name, price, total_sessions").order("name"),
   ]);
 
   const byDay = new Map<string, ApptRow[]>();
@@ -123,7 +127,16 @@ export default async function AppointmentsCalendarPage({
       const customer = first(a.customers);
       const linked = (a.appointment_services ?? []).map((row) => first(row.services)?.name).filter(Boolean) as string[];
       const single = first(a.services)?.name;
+      const linkedIds = (a.appointment_services ?? []).map((row) => row.service_id);
+      const serviceBuffer = Math.max(
+        0,
+        ...(a.appointment_services ?? []).map((row) => first(row.services)?.buffer_minutes ?? 0),
+        first(a.services)?.buffer_minutes ?? 0
+      );
       return {
+        dateKey: key,
+        bufferMinutes: a.buffer_minutes ?? serviceBuffer,
+        serviceIds: linkedIds.length > 0 ? linkedIds : a.service_id ? [a.service_id] : [],
         id: a.id,
         time: timeFmt.format(new Date(a.start_time)),
         name: customer?.name ?? "",
@@ -189,7 +202,7 @@ export default async function AppointmentsCalendarPage({
         ))}
       </div>
 
-      <MonthGrid cells={dayCells} />
+      <MonthGrid cells={dayCells} services={(serviceRows ?? []) as ServiceOption[]} />
 
       <div className="flex items-center gap-4 mt-4 text-xs text-foreground/50 flex-wrap">
         <span className="flex items-center gap-1">

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { X, ShoppingCart, Pencil, Trash2 } from "lucide-react";
+import { cancelAppointmentQuietly } from "../actions";
+import AppointmentEditor, { type ServiceOption } from "./AppointmentEditor";
 
 export type ApptInfo = {
   id: string;
@@ -14,6 +16,9 @@ export type ApptInfo = {
   services: string;
   note: string | null;
   partySize: number;
+  dateKey: string;
+  bufferMinutes: number;
+  serviceIds: string[];
 };
 
 export type DayCell = {
@@ -52,8 +57,9 @@ function dayTitle(key: string) {
   return `${m}月${d}日（${WEEKDAYS[wd]}）`;
 }
 
-export default function MonthGrid({ cells }: { cells: DayCell[] }) {
+export default function MonthGrid({ cells, services }: { cells: DayCell[]; services: ServiceOption[] }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const open = cells.find((c) => c.key === openKey) ?? null;
 
   useEffect(() => {
@@ -73,7 +79,10 @@ export default function MonthGrid({ cells }: { cells: DayCell[] }) {
             <button
               type="button"
               key={c.key}
-              onClick={() => setOpenKey(c.key)}
+              onClick={() => {
+                setEditingId(null);
+                setOpenKey(c.key);
+              }}
               className={`min-h-24 sm:min-h-28 p-0.5 sm:p-1.5 sm:rounded-lg sm:border text-left flex flex-col gap-0.5 sm:gap-1 transition-colors touch-manipulation ${
                 c.inMonth
                   ? `${c.isToday ? "bg-primary-light/50" : "bg-white"} sm:border-primary-light hover:bg-primary-light/40`
@@ -168,13 +177,13 @@ export default function MonthGrid({ cells }: { cells: DayCell[] }) {
                     <div className="flex items-start justify-between gap-2">
                       <p>
                         <span className="font-bold text-primary-dark mr-2">{a.time}</span>
-                        {a.customerId ? (
-                          <Link href={`/members/${a.customerId}`} className="font-semibold underline decoration-dotted underline-offset-2">
-                            {a.name}
-                          </Link>
-                        ) : (
-                          <span className="font-semibold">{a.name}</span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(editingId === a.id ? null : a.id)}
+                          className="font-semibold underline decoration-dotted underline-offset-2 text-left"
+                        >
+                          {a.name}
+                        </button>
                         {a.partySize > 1 && (
                           <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
                             {a.partySize} 位
@@ -192,6 +201,49 @@ export default function MonthGrid({ cells }: { cells: DayCell[] }) {
                     <p className="text-sm text-foreground/70 mt-1">{a.services}</p>
                     {a.phone && <p className="text-xs text-foreground/50 mt-0.5">{a.phone}</p>}
                     {a.note && <p className="text-xs text-foreground/50 mt-0.5">備註：{a.note}</p>}
+
+                    <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(editingId === a.id ? null : a.id)}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-primary-light text-primary-dark hover:bg-primary-light"
+                      >
+                        <Pencil size={12} /> {editingId === a.id ? "收起" : "編輯"}
+                      </button>
+                      <Link
+                        href={`/checkout?appointment=${a.id}`}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-primary-light text-primary-dark hover:bg-primary-light"
+                      >
+                        <ShoppingCart size={12} /> 開單
+                      </Link>
+                      {a.customerId && (
+                        <Link href={`/members/${a.customerId}`} className="text-xs text-foreground/50 underline">
+                          客人資料
+                        </Link>
+                      )}
+                      <form action={cancelAppointmentQuietly.bind(null, a.id)} className="ml-auto">
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 size={12} /> 刪除預約
+                        </button>
+                      </form>
+                    </div>
+
+                    {editingId === a.id && (
+                      <AppointmentEditor
+                        key={`${a.id}-${a.dateKey}-${a.time}-${a.bufferMinutes}-${a.serviceIds.join(",")}`}
+                        appointmentId={a.id}
+                        dateKey={a.dateKey}
+                        time={a.time}
+                        bufferMinutes={a.bufferMinutes}
+                        serviceIds={a.serviceIds}
+                        note={a.note}
+                        services={services}
+                        onSaved={() => setEditingId(null)}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
