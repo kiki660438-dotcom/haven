@@ -1,22 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { ChevronLeft, ChevronRight, List } from "lucide-react";
-
-const statusDot: Record<string, string> = {
-  pending: "bg-yellow-400",
-  confirmed: "bg-primary-dark",
-  cancelled: "bg-red-300",
-  completed: "bg-gray-300",
-};
-
-const statusChip: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-primary-light text-primary-dark",
-  completed: "bg-gray-100 text-gray-500",
-};
+import MonthGrid, { type DayCell, type ApptInfo } from "./MonthGrid";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
-const MAX_CHIPS_PER_DAY = 3;
 
 function taipeiToday() {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" })
@@ -48,13 +35,20 @@ function dateKey(year: number, month: number, day: number) {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
+type Named = { name: string } | { name: string }[] | null;
 type ApptRow = {
   id: string;
+  customer_id: string | null;
   start_time: string;
   status: string;
-  customers: { name: string } | { name: string }[] | null;
-  staff: { name: string } | { name: string }[] | null;
+  party_size: number | null;
+  note: string | null;
+  customers: { name: string; phone: string | null } | { name: string; phone: string | null }[] | null;
+  services: Named;
+  appointment_services: { services: Named }[] | null;
 };
+
+const first = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
 export default async function AppointmentsCalendarPage({
   searchParams,
@@ -89,7 +83,9 @@ export default async function AppointmentsCalendarPage({
   const [{ data: appointments }, { data: leaves }] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id, start_time, status, customers(name), staff(name)")
+      .select(
+        "id, customer_id, start_time, status, party_size, note, customers(name, phone), services(name), appointment_services(services(name))"
+      )
       .gte("start_time", `${gridStartKey}T00:00:00+08:00`)
       .lte("start_time", `${gridEndKey}T23:59:59+08:00`)
       .order("start_time", { ascending: true }),
@@ -113,6 +109,41 @@ export default async function AppointmentsCalendarPage({
   const nextMonth = addDays(year, month, totalDaysInMonth, 1);
   const monthLabel = `${year}年${month}月`;
   const todayKey = dateKey(today.year, today.month, today.day);
+
+  const timeFmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Taipei",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const dayCells: DayCell[] = cells.map((c) => {
+    const key = dateKey(c.year, c.month, c.day);
+    const appts: ApptInfo[] = (byDay.get(key) ?? []).map((a) => {
+      const customer = first(a.customers);
+      const linked = (a.appointment_services ?? []).map((row) => first(row.services)?.name).filter(Boolean) as string[];
+      const single = first(a.services)?.name;
+      return {
+        id: a.id,
+        time: timeFmt.format(new Date(a.start_time)),
+        name: customer?.name ?? "",
+        phone: customer?.phone ?? "",
+        customerId: a.customer_id,
+        status: a.status,
+        services: (linked.length > 0 ? linked : single ? [single] : []).join("、"),
+        note: a.note,
+        partySize: a.party_size ?? 1,
+      };
+    });
+    const leaveLabels = (leaves ?? [])
+      .filter((l) => key >= l.start_date && key <= l.end_date)
+      .map((l) =>
+        !l.all_day && l.start_time && l.end_time
+          ? `排休 ${l.start_time.slice(0, 5)}-${l.end_time.slice(0, 5)}`
+          : "排休"
+      );
+    return { key, day: c.day, inMonth: c.month === month, isToday: key === todayKey, leaves: leaveLabels, appts };
+  });
 
   return (
     <main className="max-w-5xl mx-auto px-1 py-4 sm:p-8">
@@ -158,90 +189,7 @@ export default async function AppointmentsCalendarPage({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-px sm:gap-1 bg-primary-light/70 sm:bg-transparent border-y border-primary-light/70 sm:border-0">
-        {cells.map((c) => {
-          const key = dateKey(c.year, c.month, c.day);
-          const inMonth = c.month === month;
-          const isToday = key === todayKey;
-          const dayAppointments = byDay.get(key) ?? [];
-          const shown = dayAppointments.slice(0, MAX_CHIPS_PER_DAY);
-          const extra = dayAppointments.length - shown.length;
-          const dayLeaves = (leaves ?? []).filter((l) => key >= l.start_date && key <= l.end_date);
-
-          return (
-            <Link
-              key={key}
-              href={`/appointments/day?date=${key}`}
-              className={`min-h-24 sm:min-h-28 p-0.5 sm:p-1.5 sm:rounded-lg sm:border text-left flex flex-col gap-0.5 sm:gap-1 transition-colors ${
-                inMonth
-                  ? `${isToday ? "bg-primary-light/50" : "bg-white"} sm:border-primary-light hover:bg-primary-light/40`
-                  : "bg-gray-50 sm:border-gray-100 text-foreground/30 hover:bg-gray-100"
-              }`}
-            >
-              <span
-                className={`text-xs w-5 h-5 flex items-center justify-center rounded-full ${
-                  isToday ? "bg-primary-dark text-white font-semibold" : ""
-                }`}
-              >
-                {c.day}
-              </span>
-              {dayLeaves.map((l, i) => (
-                <span
-                  key={`leave-${i}`}
-                  className="block rounded px-0.5 text-[11px] leading-[14px] bg-sky-100 text-sky-700 sm:truncate"
-                >
-                  排休
-                  {!l.all_day && l.start_time && l.end_time
-                    ? ` ${l.start_time.slice(0, 5)}-${l.end_time.slice(0, 5)}`
-                    : ""}
-                </span>
-              ))}
-              {/* 手機版：格子貼滿畫面、姓名完整顯示（依狀態上色）；桌機顯示時間＋姓名 */}
-              <div className="flex sm:hidden flex-col gap-0.5">
-                {dayAppointments.map((a) => {
-                  const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
-                  return (
-                    <span
-                      key={a.id}
-                      className={`block break-all rounded px-0.5 text-[11px] leading-[14px] ${
-                        statusChip[a.status] ?? "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {customer?.name}
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="hidden sm:flex flex-col gap-0.5">
-                {shown.map((a) => {
-                  const customer = Array.isArray(a.customers) ? a.customers[0] : a.customers;
-                  const staff = Array.isArray(a.staff) ? a.staff[0] : a.staff;
-                  const time = new Date(a.start_time).toLocaleTimeString("zh-TW", {
-                    timeZone: "Asia/Taipei",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                  return (
-                    <span
-                      key={a.id}
-                      className="flex items-center gap-1 text-[11px] leading-tight truncate"
-                      title={`${time} ${customer?.name ?? ""}${staff?.name ? `（${staff.name}）` : ""}`}
-                    >
-                      <span
-                        className={`shrink-0 w-1.5 h-1.5 rounded-full ${statusDot[a.status] ?? "bg-gray-300"}`}
-                      />
-                      <span className="truncate">
-                        {time} {customer?.name}
-                      </span>
-                    </span>
-                  );
-                })}
-                {extra > 0 && <span className="text-[11px] text-foreground/40">+{extra} 筆</span>}
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+      <MonthGrid cells={dayCells} />
 
       <div className="flex items-center gap-4 mt-4 text-xs text-foreground/50 flex-wrap">
         <span className="flex items-center gap-1">
