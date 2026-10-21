@@ -218,14 +218,15 @@ export default async function AppointmentsPage({
                         >
                           {statusLabel[a.status] ?? a.status}
                         </span>
-                        <Link
+                        {/* 手機上用一般連結比 Next 的 Link 更穩，點了一定會換頁 */}
+                        <a
                           href={`/appointments/day?date=${a.dateKey}`}
                           title="查看這天所有預約"
                           aria-label="查看這天所有預約"
-                          className="p-1.5 rounded-lg text-primary-dark hover:bg-primary-light transition-colors"
+                          className="p-3 -m-1.5 rounded-lg text-primary-dark hover:bg-primary-light active:bg-primary-light transition-colors touch-manipulation relative z-10"
                         >
-                          <CalendarSearch size={18} />
-                        </Link>
+                          <CalendarSearch size={20} />
+                        </a>
                       </div>
                     </div>
 
