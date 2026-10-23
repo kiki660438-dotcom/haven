@@ -12,6 +12,7 @@ type OrderLine = {
   qty: number;
   discount: number;
   voucher_id: string | null;
+  use_now?: boolean;
 };
 
 type OrderPayload = {
@@ -54,6 +55,7 @@ export async function createOrder(formData: FormData) {
     qty: Math.min(Math.max(int(l.qty), 1), 20),
     discount: int(l.discount),
     voucher_id: l.voucher_id || null,
+    use_now: !!l.use_now,
   }));
   if (lines.length === 0) fail(appointment_id, "請至少加入一項消費項目");
   if (lines.some((l) => !l.name)) fail(appointment_id, "每一項都要有名稱");
@@ -169,9 +171,14 @@ export async function createOrder(formData: FormData) {
   const packageLines = priced.filter((l) => l.isPackage && l.service);
   if (packageLines.length > 0 && customer_id) {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+    // 記下每一行第一張新券的代碼，「今天先用一堂」要扣的就是它
+    const firstCodeByLine = new Map<(typeof packageLines)[number], string>();
     const newVouchers = packageLines.flatMap((l) =>
-      Array.from({ length: l.qty }, () => ({
-        code: Math.random().toString(36).slice(2, 10).toUpperCase(),
+      Array.from({ length: l.qty }, (_, idx) => {
+        const code = Math.random().toString(36).slice(2, 10).toUpperCase();
+        if (idx === 0) firstCodeByLine.set(l, code);
+        return {
+        code,
         customer_id,
         service_name: l.service!.name,
         initial_value: l.service!.price,
@@ -181,10 +188,31 @@ export async function createOrder(formData: FormData) {
         status: "active",
         purchased_at: today,
         issued_at: `${today}T12:00:00+08:00`,
-      }))
+        };
+      })
     );
-    const { error: voucherError } = await supabase.from("vouchers").insert(newVouchers);
+    const { data: created, error: voucherError } = await supabase
+      .from("vouchers")
+      .insert(newVouchers)
+      .select("id, code");
     if (voucherError) throw new Error("建立商品券失敗：" + voucherError.message);
+
+    // 買了馬上用一堂：扣新券 1 堂，並在訂單裡留一筆「今日使用一堂」（不收費）
+    for (const l of packageLines) {
+      if (!l.use_now) continue;
+      const code = firstCodeByLine.get(l);
+      const voucher = created?.find((v) => v.code === code);
+      if (!voucher) continue;
+      await deductVoucherSession(voucher.id);
+      await supabase.from("order_items").insert({
+        order_id: order.id,
+        service_id: l.service_id,
+        service_name: `${l.name}（今日使用一堂）`,
+        price: 0,
+        quantity: 1,
+        unit_cost: 0,
+      });
+    }
   }
 
   for (const l of priced) {

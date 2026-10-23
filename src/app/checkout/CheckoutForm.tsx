@@ -21,6 +21,7 @@ type Line = {
   qty: number;
   discount: number;
   voucher_id: string | null;
+  use_now?: boolean;
 };
 
 // 服務名稱用「主題-細項」命名（例如「冷塑燙-中髮」），依主題分組，只有一種選項的直接顯示
@@ -88,6 +89,9 @@ export default function CheckoutForm({
   const [cashInput, setCashInput] = useState(0);
   const [transferInput, setTransferInput] = useState(0);
 
+  const isPackageLine = (l: Line) =>
+    !l.voucher_id && !!l.service_id && !!services.find((s) => s.id === l.service_id)?.total_sessions;
+
   const lineTotal = (l: Line) => (l.voucher_id ? 0 : Math.max(0, l.price * l.qty - l.discount));
   const payable = lines.reduce((sum, l) => sum + lineTotal(l), 0);
   const subtotal = lines.reduce((sum, l) => sum + (l.voucher_id ? 0 : l.price * l.qty), 0);
@@ -135,6 +139,7 @@ export default function CheckoutForm({
       qty: l.qty,
       discount: l.discount,
       voucher_id: l.voucher_id,
+      use_now: !!l.use_now && isPackageLine(l),
     })),
   });
 
@@ -184,6 +189,17 @@ export default function CheckoutForm({
                 <Trash2 size={16} />
               </button>
             </div>
+
+            {isPackageLine(l) && (
+              <label className="flex items-center gap-2 text-sm rounded-lg bg-primary-light/50 px-3 py-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!l.use_now}
+                  onChange={(e) => updateLine(l.key, { use_now: e.target.checked })}
+                />
+                今天先用一堂（買了馬上扣 1 堂，不另外收費）
+              </label>
+            )}
 
             {!l.voucher_id && (
               <>
