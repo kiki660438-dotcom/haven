@@ -20,6 +20,7 @@ type OrderPayload = {
   customer_id: string | null;
   customer_name: string | null;
   staff_id: string | null;
+  record?: string;
   cash: number;
   transfer: number;
   lines: OrderLine[];
@@ -217,6 +218,17 @@ export async function createOrder(formData: FormData) {
 
   for (const l of priced) {
     if (l.voucher_id) await deductVoucherSession(l.voucher_id);
+  }
+
+  // 這次的配方／服務紀錄存進客人資料（失敗不影響開單）
+  const recordText = (payload.record ?? "").trim();
+  if (recordText && customer_id) {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+    const { error: recordError } = await supabase
+      .from("customer_records")
+      .insert({ customer_id, content: recordText, visit_date: today, order_id: order.id });
+    if (recordError) console.error("save customer record failed", recordError);
+    revalidatePath(`/members/${customer_id}`);
   }
 
   if (appointment_id) {

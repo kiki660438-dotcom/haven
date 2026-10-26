@@ -28,7 +28,7 @@ export default async function CheckoutPage({
 
   const customerId = appointment?.customer_id ?? selectedCustomerId ?? "";
 
-  const [{ data: services }, { data: staffList }, customersResult, customerResult, vouchersResult] =
+  const [{ data: services }, { data: staffList }, customersResult, customerResult, vouchersResult, lastRecordResult] =
     await Promise.all([
       supabase.from("services").select("id, name, price, total_sessions").order("name"),
       supabase.from("staff").select("id, name").eq("active", true).order("name"),
@@ -47,7 +47,20 @@ export default async function CheckoutPage({
             .gt("remaining_sessions", 0)
             .order("purchased_at")
         : Promise.resolve({ data: [] }),
+      customerId
+        ? supabase
+            .from("customer_records")
+            .select("visit_date, content")
+            .eq("customer_id", customerId)
+            .order("visit_date", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(1)
+        : Promise.resolve({ data: [] }),
     ]);
+
+  const lastRecord = lastRecordResult.data?.[0]
+    ? { date: lastRecordResult.data[0].visit_date as string, content: lastRecordResult.data[0].content as string }
+    : null;
 
   const customer = customerResult.data;
   const customerLabel = customer ? `${customer.name}（${customer.phone ?? ""}）` : "";
@@ -98,6 +111,7 @@ export default async function CheckoutPage({
         customerLabel={customerLabel}
         initialServiceIds={initialServiceIds}
         defaultStaffId={appointment?.staff_id ?? ""}
+        lastRecord={lastRecord}
       />
     </main>
   );

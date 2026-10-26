@@ -50,6 +50,7 @@ export default function CheckoutForm({
   customerLabel,
   initialServiceIds,
   defaultStaffId,
+  lastRecord,
 }: {
   services: CheckoutService[];
   vouchers: CheckoutVoucher[];
@@ -59,6 +60,7 @@ export default function CheckoutForm({
   customerLabel: string;
   initialServiceIds: string[];
   defaultStaffId: string;
+  lastRecord: { date: string; content: string } | null;
 }) {
   const regular = services.filter((s) => !s.total_sessions);
   const packages = services.filter((s) => s.total_sessions);
@@ -85,6 +87,7 @@ export default function CheckoutForm({
   const [customPrice, setCustomPrice] = useState("");
   const [walkInName, setWalkInName] = useState("");
   const [staffId, setStaffId] = useState(defaultStaffId);
+  const [record, setRecord] = useState("");
   const [payTouched, setPayTouched] = useState(false);
   const [cashInput, setCashInput] = useState(0);
   const [transferInput, setTransferInput] = useState(0);
@@ -130,6 +133,7 @@ export default function CheckoutForm({
     customer_id: customerId || null,
     customer_name: customerId ? null : walkInName.trim() || null,
     staff_id: staffId || null,
+    record: customerId ? record.trim() : "",
     cash,
     transfer,
     lines: lines.map((l) => ({
@@ -164,6 +168,27 @@ export default function CheckoutForm({
           />
         )}
       </section>
+
+      {customerId && (
+        <section className="p-4 border border-primary-light rounded-xl bg-white flex flex-col gap-2">
+          {lastRecord && (
+            <div className="rounded-lg bg-primary-light/50 px-3 py-2">
+              <p className="text-xs text-foreground/50 mb-0.5">上次紀錄（{lastRecord.date.replaceAll("-", "/")}）</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{lastRecord.content}</p>
+            </div>
+          )}
+          <label className="text-xs text-foreground/50">
+            這次的配方／紀錄（選填，會存到客人資料的「配方紀錄」）
+            <textarea
+              value={record}
+              onChange={(e) => setRecord(e.target.value)}
+              rows={3}
+              placeholder="例如：7/0 + 6/1 = 1:1，雙氧 6%，停留 35 分鐘"
+              className="block w-full border border-primary-light rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            />
+          </label>
+        </section>
+      )}
 
       <section className="p-4 border border-primary-light rounded-xl bg-white flex flex-col gap-3">
         <p className="font-semibold">消費項目</p>

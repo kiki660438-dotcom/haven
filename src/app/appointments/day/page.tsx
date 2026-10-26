@@ -101,6 +101,23 @@ export default async function DayPage({
     await Promise.all(lineIds.map(async (id) => [id, await getLineDisplayName(id)] as const))
   );
 
+  // 每位客人最近一筆配方／服務紀錄，做的時候直接看得到上次怎麼調的
+  const customerIds = [...new Set(dayList.map((a) => a.customer_id).filter((x): x is string => !!x))];
+  const lastRecordByCustomer = new Map<string, { date: string; content: string }>();
+  if (customerIds.length > 0) {
+    const { data: recs } = await supabase
+      .from("customer_records")
+      .select("customer_id, visit_date, content")
+      .in("customer_id", customerIds)
+      .order("visit_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    for (const r of recs ?? []) {
+      if (!lastRecordByCustomer.has(r.customer_id)) {
+        lastRecordByCustomer.set(r.customer_id, { date: r.visit_date, content: r.content });
+      }
+    }
+  }
+
   const byTime = new Map<string, typeof dayList>();
   for (const a of dayList) {
     const t = timeOf(a.start_time);
@@ -261,6 +278,16 @@ export default async function DayPage({
                       <span className="text-foreground/40">　約 {durationLabel(duration)}</span>
                     </p>
                     {a.note && <p className="text-xs text-foreground/50 mt-1">備註：{a.note}</p>}
+                    {a.customer_id && lastRecordByCustomer.get(a.customer_id) && (
+                      <div className="mt-2 rounded-lg bg-primary-light/50 px-3 py-2">
+                        <p className="text-xs text-foreground/50 mb-0.5">
+                          上次紀錄（{lastRecordByCustomer.get(a.customer_id)!.date.replaceAll("-", "/")}）
+                        </p>
+                        <p className="text-sm whitespace-pre-wrap break-words line-clamp-4">
+                          {lastRecordByCustomer.get(a.customer_id)!.content}
+                        </p>
+                      </div>
+                    )}
                     <p className="text-[11px] text-foreground/40 mt-1">
                       建立時間 {dateKeyOf(a.created_at)} {timeOf(a.created_at)}
                     </p>

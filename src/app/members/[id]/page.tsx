@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { getLineProfile } from "@/lib/line";
+import RecordsPanel, { type RecordRow } from "./RecordsPanel";
 import { Phone, MessageSquare, CalendarPlus, ShoppingCart, ChevronLeft, Pencil } from "lucide-react";
 
 const TABS = [
   { key: "info", label: "會員資料" },
+  { key: "records", label: "配方紀錄" },
   { key: "orders", label: "消費紀錄" },
   { key: "vouchers", label: "商品券" },
   { key: "appointments", label: "預約紀錄" },
@@ -61,7 +63,7 @@ export default async function MemberDetailPage({
   const activeTab = TABS.some((t) => t.key === tab) ? (tab as string) : "info";
 
   const supabase = await createClient();
-  const [{ data: customer }, { data: orders }, { data: vouchers }, { data: appointments }] =
+  const [{ data: customer }, { data: orders }, { data: vouchers }, { data: appointments }, { data: recordRows }] =
     await Promise.all([
       supabase.from("customers").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -81,7 +83,20 @@ export default async function MemberDetailPage({
         .eq("customer_id", id)
         .order("start_time", { ascending: false })
         .limit(150),
+      supabase
+        .from("customer_records")
+        .select("id, visit_date, content")
+        .eq("customer_id", id)
+        .order("visit_date", { ascending: false })
+        .order("created_at", { ascending: false }),
     ]);
+
+  const records: RecordRow[] = (recordRows ?? []).map((r) => ({
+    id: r.id,
+    visitDate: r.visit_date,
+    content: r.content,
+  }));
+  const todayTaipei = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
 
   if (!customer) {
     return (
@@ -213,6 +228,8 @@ export default async function MemberDetailPage({
           </div>
         </div>
       )}
+
+      {activeTab === "records" && <RecordsPanel customerId={id} today={todayTaipei} records={records} />}
 
       {activeTab === "orders" && (
         <div className="flex flex-col gap-3">
