@@ -249,8 +249,10 @@ export default function MonthGrid({ cells, services }: { cells: DayCell[]; servi
               </div>
             )}
 
+            {/* prefetch：小視窗一打開就先把整頁資料在背景載好，按下去才不用等 */}
             <Link
               href={`/appointments/day?date=${open.key}`}
+              prefetch
               className="block text-center text-sm text-primary-dark underline mt-4"
             >
               開啟完整當日頁面（可確認、開單）

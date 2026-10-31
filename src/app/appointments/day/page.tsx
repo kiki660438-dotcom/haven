@@ -93,6 +93,7 @@ export default async function DayPage({
     weekday: "short",
   }).format(new Date(`${date}T00:00:00+08:00`));
 
+  // LINE 暱稱和上次配方紀錄互不依賴，一起查（原本是一個等一個，頁面會慢）
   const lineIds = [
     ...new Set(
       dayList
@@ -100,24 +101,26 @@ export default async function DayPage({
         .filter((id): id is string => !!id)
     ),
   ];
-  const lineNames = new Map(
-    await Promise.all(lineIds.map(async (id) => [id, await getLineDisplayName(id)] as const))
-  );
-
-  // 每位客人最近一筆配方／服務紀錄，做的時候直接看得到上次怎麼調的
   const customerIds = [...new Set(dayList.map((a) => a.customer_id).filter((x): x is string => !!x))];
+
+  const [lineEntries, recordsResult] = await Promise.all([
+    Promise.all(lineIds.map(async (id) => [id, await getLineDisplayName(id)] as const)),
+    customerIds.length > 0
+      ? supabase
+          .from("customer_records")
+          .select("customer_id, visit_date, content")
+          .in("customer_id", customerIds)
+          .order("visit_date", { ascending: false })
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { customer_id: string; visit_date: string; content: string }[] }),
+  ]);
+
+  const lineNames = new Map(lineEntries);
+  // 每位客人最近一筆配方／服務紀錄，做的時候直接看得到上次怎麼調的
   const lastRecordByCustomer = new Map<string, { date: string; content: string }>();
-  if (customerIds.length > 0) {
-    const { data: recs } = await supabase
-      .from("customer_records")
-      .select("customer_id, visit_date, content")
-      .in("customer_id", customerIds)
-      .order("visit_date", { ascending: false })
-      .order("created_at", { ascending: false });
-    for (const r of recs ?? []) {
-      if (!lastRecordByCustomer.has(r.customer_id)) {
-        lastRecordByCustomer.set(r.customer_id, { date: r.visit_date, content: r.content });
-      }
+  for (const r of recordsResult.data ?? []) {
+    if (!lastRecordByCustomer.has(r.customer_id)) {
+      lastRecordByCustomer.set(r.customer_id, { date: r.visit_date, content: r.content });
     }
   }
 
