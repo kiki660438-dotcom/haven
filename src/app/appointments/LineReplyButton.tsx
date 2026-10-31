@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { MessageCircle, Copy } from "lucide-react";
 
-export default function LineReplyButton({ text, nickname }: { text: string; nickname: string | null }) {
+export default function LineReplyButton({
+  text,
+  nickname,
+  messageLabel = "複製預約成功訊息",
+}: {
+  text: string;
+  nickname: string | null;
+  messageLabel?: string;
+}) {
   const [state, setState] = useState<"idle" | "message" | "nickname">("idle");
 
   const copy = async (value: string) => {
@@ -38,7 +46,7 @@ export default function LineReplyButton({ text, nickname }: { text: string; nick
         className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
       >
         <MessageCircle size={14} />
-        {state === "message" ? "已複製訊息，到聊天室貼上" : "複製預約成功訊息"}
+        {state === "message" ? "已複製訊息，到聊天室貼上" : messageLabel}
       </button>
     </span>
   );

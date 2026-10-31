@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus } from "../actions";
 import { getLineDisplayName } from "@/lib/line";
 import LineReplyButton from "../LineReplyButton";
-import { confirmMessage, smsLink } from "@/lib/messages";
+import { confirmMessage, reminderMessage, smsLink } from "@/lib/messages";
 import { Check, ChevronLeft, ChevronRight, ShoppingCart, List, MessageSquare } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -56,9 +56,12 @@ type ServiceRow = { name: string; price: number; duration_minutes: number | null
 export default async function DayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; msg?: string }>;
 }) {
-  const { date: rawDate } = await searchParams;
+  const { date: rawDate, msg } = await searchParams;
+  const remindMode = msg === "remind";
+  const q = remindMode ? "&msg=remind" : "";
+  const tomorrow = addDays(todayKey(), 1);
   const today = todayKey();
   const date = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : today;
 
@@ -147,7 +150,7 @@ export default async function DayPage({
 
       <div className="flex items-center gap-1 mb-6">
         <Link
-          href={`/appointments/day?date=${addDays(date, -7)}`}
+          href={`/appointments/day?date=${addDays(date, -7)}${q}`}
           aria-label="上一週"
           className="p-2 rounded-lg hover:bg-primary-light text-primary-dark"
         >
@@ -160,7 +163,7 @@ export default async function DayPage({
             return (
               <Link
                 key={d}
-                href={`/appointments/day?date=${d}`}
+                href={`/appointments/day?date=${d}${q}`}
                 className={`flex flex-col items-center py-2 rounded-xl transition-colors ${
                   selected ? "bg-primary-dark text-white" : "hover:bg-primary-light text-foreground"
                 }`}
@@ -187,7 +190,7 @@ export default async function DayPage({
           })}
         </div>
         <Link
-          href={`/appointments/day?date=${addDays(date, 7)}`}
+          href={`/appointments/day?date=${addDays(date, 7)}${q}`}
           aria-label="下一週"
           className="p-2 rounded-lg hover:bg-primary-light text-primary-dark"
         >
@@ -195,9 +198,32 @@ export default async function DayPage({
         </Link>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Link
+          href={`/appointments/day?date=${tomorrow}&msg=remind`}
+          className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
+            remindMode && date === tomorrow
+              ? "bg-primary-dark text-white border-primary-dark"
+              : "border-primary-light text-primary-dark hover:bg-primary-light"
+          }`}
+        >
+          明天・傳提醒
+        </Link>
+        {remindMode && (
+          <Link href={`/appointments/day?date=${date}`} className="text-sm text-foreground/50 underline">
+            改回「預約成功」訊息
+          </Link>
+        )}
+      </div>
+      {remindMode && (
+        <p className="text-xs text-foreground/60 mb-4 px-3 py-2 rounded-lg bg-primary-light/50">
+          提醒模式：卡片上的按鈕會複製／傳送「前一天提醒」訊息（免費，不佔 LINE 額度）。
+        </p>
+      )}
+
       {date !== today && (
         <Link
-          href={`/appointments/day?date=${today}`}
+          href={`/appointments/day?date=${today}${q}`}
           className="inline-block text-sm text-primary-dark underline mb-4"
         >
           回到今天
@@ -303,15 +329,25 @@ export default async function DayPage({
                       {a.status === "confirmed" && customer?.line_user_id && (
                         <LineReplyButton
                           nickname={lineNames.get(customer.line_user_id) ?? null}
-                          text={confirmMessage(customer.name ?? "", a.start_time)}
+                          text={
+                            remindMode
+                              ? reminderMessage(customer.name ?? "", a.start_time)
+                              : confirmMessage(customer.name ?? "", a.start_time)
+                          }
+                          messageLabel={remindMode ? "複製提醒訊息" : "複製預約成功訊息"}
                         />
                       )}
                       {a.status === "confirmed" && customer?.phone && (
                         <a
-                          href={smsLink(customer.phone, confirmMessage(customer.name ?? "", a.start_time))}
+                          href={smsLink(
+                            customer.phone,
+                            remindMode
+                              ? reminderMessage(customer.name ?? "", a.start_time)
+                              : confirmMessage(customer.name ?? "", a.start_time)
+                          )}
                           className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
                         >
-                          <MessageSquare size={14} /> 傳簡訊通知
+                          <MessageSquare size={14} /> {remindMode ? "傳簡訊提醒" : "傳簡訊通知"}
                         </a>
                       )}
                       <Link
