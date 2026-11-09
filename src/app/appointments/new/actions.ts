@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getActiveStaffIds } from "../../book/actions";
 
+// 不要用 throw：正式環境會把錯誤訊息藏起來，只顯示「This page couldn't load」，
+// 改成帶著原因導回表單，畫面上才看得到到底是哪裡出錯
+function failWith(query: string, message: string): never {
+  redirect(`/appointments/new?${query}&error=failed&message=${encodeURIComponent(message)}`);
+}
+
 export async function createStaffAppointment(formData: FormData) {
   const supabase = await createClient();
 
@@ -20,7 +26,13 @@ export async function createStaffAppointment(formData: FormData) {
   const bufferMinutesPart = Number(formData.get("buffer_minutes")) || 0;
   const buffer_minutes = bufferHours * 60 + bufferMinutesPart;
 
-  const query = `service_id=${service_ids.join(",")}&date=${date}&staff_id=${requestedStaffId ?? ""}&customer_id=${existingCustomerId}`;
+  // 服務可以複選，要用重複的 service_id 參數帶回去（不能用逗號串起來，頁面讀不懂）
+  const params = new URLSearchParams();
+  for (const id of service_ids) params.append("service_id", id);
+  params.set("date", date ?? "");
+  params.set("staff_id", requestedStaffId ?? "");
+  params.set("customer_id", existingCustomerId);
+  const query = params.toString();
 
   if (service_ids.length === 0 || !date || !time) {
     redirect(`/appointments/new?${query}&error=no_slot`);
@@ -42,12 +54,18 @@ export async function createStaffAppointment(formData: FormData) {
       const { error: createError } = await supabase
         .from("customers")
         .insert({ name: newName, phone: newPhone });
-      if (createError) throw new Error("建立客戶失敗：" + createError.message);
+      if (createError) {
+        console.error("createStaffAppointment: insert customer failed", createError);
+        failWith(query, "建立新客人失敗：" + createError.message);
+      }
 
-      const { data: newId } = await supabase.rpc("find_customer_id_by_phone", {
+      const { data: newId, error: lookupError } = await supabase.rpc("find_customer_id_by_phone", {
         p_phone: newPhone,
       });
-      if (!newId) throw new Error("建立客戶失敗");
+      if (!newId) {
+        console.error("createStaffAppointment: lookup new customer failed", lookupError);
+        failWith(query, "新客人已建立，但找不到他的資料" + (lookupError ? "：" + lookupError.message : ""));
+      }
       customer_id = newId;
     }
   }
@@ -77,13 +95,15 @@ export async function createStaffAppointment(formData: FormData) {
     .single();
 
   if (error || !appointment) {
-    redirect(`/appointments/new?${query}&error=conflict`);
+    console.error("createStaffAppointment: insert appointment failed", error);
+    failWith(query, "建立預約失敗" + (error ? "：" + error.message : ""));
   }
 
   if (service_ids.length > 1) {
-    await supabase
+    const { error: servicesError } = await supabase
       .from("appointment_services")
       .insert(service_ids.map((service_id) => ({ appointment_id: appointment.id, service_id })));
+    if (servicesError) console.error("createStaffAppointment: insert services failed", servicesError);
   }
 
   revalidatePath("/appointments");

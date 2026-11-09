@@ -31,9 +31,10 @@ export default async function NewAppointmentPage({
     date?: string;
     staff_id?: string;
     customer_id?: string;
+    message?: string;
   }>;
 }) {
-  const { error, service_id, date, staff_id, customer_id } = await searchParams;
+  const { error, service_id, date, staff_id, customer_id, message } = await searchParams;
   const customerId = customer_id ?? "";
   const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
 
@@ -98,6 +99,11 @@ export default async function NewAppointmentPage({
       {error === "no_slot" && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
           請選擇服務、日期與時段。
+        </div>
+      )}
+      {error === "failed" && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          {message || "建立預約失敗，請再試一次。"}
         </div>
       )}
       {error === "no_customer" && (
