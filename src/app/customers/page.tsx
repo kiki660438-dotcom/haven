@@ -1,13 +1,18 @@
 import { createClient } from "@/lib/supabase-server";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { addCustomer } from "./actions";
 import CustomersSearchTable from "./CustomersSearchTable";
 
 export default async function CustomersPage() {
   const supabase = await createClient();
-  const { data: customers } = await supabase
-    .from("customers")
-    .select("*, orders(status)")
-    .order("created_at", { ascending: false });
+  const customers = await fetchAllRows((from, to) =>
+    supabase
+      .from("customers")
+      .select("*, orders(status)")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to)
+  );
 
   const rows =
     customers?.map((c) => ({

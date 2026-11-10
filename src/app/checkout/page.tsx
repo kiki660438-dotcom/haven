@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase-server";
+import { fetchAllRows } from "@/lib/fetch-all";
 import CustomerPicker from "./CustomerPicker";
 import CheckoutForm from "./CheckoutForm";
 
@@ -34,7 +35,9 @@ export default async function CheckoutPage({
       supabase.from("staff").select("id, name").eq("active", true).order("name"),
       appointment
         ? Promise.resolve({ data: null })
-        : supabase.from("customers").select("id, name, phone").order("name"),
+        : fetchAllRows((from, to) =>
+            supabase.from("customers").select("id, name, phone").order("name").order("id").range(from, to)
+          ).then((data) => ({ data })),
       customerId
         ? supabase.from("customers").select("name, phone").eq("id", customerId).maybeSingle()
         : Promise.resolve({ data: null }),
