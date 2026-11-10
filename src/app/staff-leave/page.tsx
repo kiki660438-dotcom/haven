@@ -7,7 +7,12 @@ function todayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
 }
 
-export default async function StaffLeavePage() {
+export default async function StaffLeavePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; success?: string }>;
+}) {
+  const { error, success } = await searchParams;
   const supabase = await createClient();
   const [{ data: leaveRows }, { data: staffList }] = await Promise.all([
     supabase
@@ -35,6 +40,11 @@ export default async function StaffLeavePage() {
       <p className="text-sm text-foreground/50 mb-6">
         設定的時間，客人在線上預約會約不到；選「全門店」等於整間店公休，選特定設計師則只擋那位設計師。
       </p>
+
+      {error && <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">{error}</div>}
+      {success && !error && (
+        <div className="mb-6 p-4 rounded-xl bg-green-50 text-green-700">已新增請假／排休。</div>
+      )}
 
       <form
         action={addStaffLeave}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { createStaffAppointment } from "./actions";
 import { getStaffSlots } from "../../book/actions";
 import CustomerPicker from "../../checkout/CustomerPicker";
@@ -31,18 +32,25 @@ export default async function NewAppointmentPage({
     date?: string;
     staff_id?: string;
     customer_id?: string;
+    message?: string;
   }>;
 }) {
-  const { error, service_id, date, staff_id, customer_id } = await searchParams;
+  const { error, service_id, date, staff_id, customer_id, message } = await searchParams;
   const customerId = customer_id ?? "";
   const serviceIds = service_id ? (Array.isArray(service_id) ? service_id : [service_id]) : [];
 
   const supabase = await createClient();
-  const [{ data: allServices }, { data: staffList }, { data: customers }, { data: voucherRows }] =
+  const [{ data: allServices }, { data: staffList }, customers, { data: selectedCustomer }, { data: voucherRows }] =
     await Promise.all([
       supabase.from("services").select("id, name, price, total_sessions").order("name"),
       supabase.from("staff").select("id, name").eq("active", true).order("name"),
-      supabase.from("customers").select("id, name, phone").order("name"),
+      fetchAllRows((from, to) =>
+        supabase.from("customers").select("id, name, phone").order("name").order("id").range(from, to)
+      ),
+      // 已選的客人直接用 id 查，不要靠上面的名單找（名單漏掉時名字會變空白）
+      customerId
+        ? supabase.from("customers").select("id, name, phone").eq("id", customerId).maybeSingle()
+        : Promise.resolve({ data: null }),
       customerId
         ? supabase
             .from("vouchers")
@@ -53,7 +61,6 @@ export default async function NewAppointmentPage({
         : Promise.resolve({ data: [] as { service_name: string | null; remaining_sessions: number }[] }),
     ]);
 
-  const selectedCustomer = customers?.find((c) => c.id === customerId);
   const customerLabel = selectedCustomer
     ? `${selectedCustomer.name}（${selectedCustomer.phone ?? ""}）`
     : undefined;
@@ -100,6 +107,11 @@ export default async function NewAppointmentPage({
           請選擇服務、日期與時段。
         </div>
       )}
+      {error === "failed" && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
+          {message || "建立預約失敗，請再試一次。"}
+        </div>
+      )}
       {error === "no_customer" && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-600">
           請選擇現有客人，或填寫新客人姓名與電話。
@@ -115,7 +127,7 @@ export default async function NewAppointmentPage({
           先選客人，系統會自動列出他已購買的商品券。新客人或現場客可以略過這一步。
         </p>
         <CustomerPicker
-          customers={customers ?? []}
+          customers={customers}
           name="customer_id"
           defaultCustomerId={customerId}
           defaultLabel={customerLabel}
@@ -257,7 +269,7 @@ export default async function NewAppointmentPage({
           <div>
             <p className="text-sm mb-2 text-foreground/60">客人</p>
             <CustomerPicker
-              customers={customers ?? []}
+              customers={customers}
               name="customer_id"
               defaultCustomerId={customerId}
               defaultLabel={customerLabel}

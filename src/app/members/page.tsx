@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase-server";
+import { fetchAllRows } from "@/lib/fetch-all";
 import MembersSearchTable from "./MembersSearchTable";
 
 function calcAge(birthday: string | null) {
@@ -13,10 +14,14 @@ function calcAge(birthday: string | null) {
 
 export default async function MembersPage() {
   const supabase = await createClient();
-  const { data: customers } = await supabase
-    .from("customers")
-    .select("id, name, phone, birthday, gender, orders(total, status, created_at)")
-    .order("name");
+  const customers = await fetchAllRows((from, to) =>
+    supabase
+      .from("customers")
+      .select("id, name, phone, birthday, gender, orders(total, status, created_at)")
+      .order("name")
+      .order("id")
+      .range(from, to)
+  );
 
   const rows =
     customers?.map((c) => {
