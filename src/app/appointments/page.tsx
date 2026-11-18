@@ -4,9 +4,9 @@ import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import AppointmentEditor, { type ServiceOption } from "./calendar/AppointmentEditor";
 import { getLineDisplayName } from "@/lib/line";
 import LineReplyButton from "./LineReplyButton";
-import { confirmMessage, smsLink } from "@/lib/messages";
+import { confirmMessage, reminderMessage, smsLink } from "@/lib/messages";
 import { MessageSquare } from "lucide-react";
-import { Check, X, ShoppingCart, ChevronDown, Calendar, CalendarSearch, Plus } from "lucide-react";
+import { Check, X, ShoppingCart, ChevronDown, Calendar, CalendarSearch, Plus, Bell } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   pending: "待確認",
@@ -39,6 +39,11 @@ function toTimeInputValue(iso: string) {
 
 function todayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+}
+
+function tomorrowKey() {
+  const [y, m, d] = todayKey().split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
 function dateHeading(key: string) {
@@ -129,7 +134,13 @@ export default async function AppointmentsPage({
     <main className="max-w-3xl mx-auto p-8">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-primary-dark">預約管理</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href={`/appointments/day?date=${tomorrowKey()}&msg=remind`}
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
+          >
+            <Bell size={14} /> 明天・傳提醒
+          </Link>
           <Link
             href="/appointments/new"
             className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-primary-dark text-white hover:bg-primary transition-colors"
@@ -309,6 +320,13 @@ export default async function AppointmentsPage({
                         <LineReplyButton
                           nickname={lineNames.get(customer.line_user_id) ?? null}
                           text={confirmMessage(customer.name ?? "", a.start_time)}
+                        />
+                      )}
+                      {a.status === "confirmed" && a.dateKey >= today && (
+                        <LineReplyButton
+                          nickname={null}
+                          text={reminderMessage(customer?.name ?? "", a.start_time)}
+                          messageLabel="複製提醒訊息"
                         />
                       )}
                       {a.status === "confirmed" && customer?.phone && (
