@@ -123,10 +123,18 @@ export default async function NewAppointmentPage({
         action="/appointments/new"
         className="flex flex-col gap-3 p-5 border border-primary-light rounded-xl bg-white mb-6"
       >
+        {/* 換客人時保留已經查詢過的服務、日期、設計師 */}
+        {serviceIds.map((id) => (
+          <input key={id} type="hidden" name="service_id" value={id} />
+        ))}
+        {date && <input type="hidden" name="date" value={date} />}
+        {staff_id && <input type="hidden" name="staff_id" value={staff_id} />}
         <p className="text-sm text-foreground/60">
-          先選客人，系統會自動列出他已購買的商品券。新客人或現場客可以略過這一步。
+          先選客人（點選名字就會帶入），系統會自動列出他已購買的商品券。新客人或現場客可以略過這一步。
         </p>
         <CustomerPicker
+          key={customerId}
+          autoSubmit
           customers={customers}
           name="customer_id"
           defaultCustomerId={customerId}
@@ -269,6 +277,7 @@ export default async function NewAppointmentPage({
           <div>
             <p className="text-sm mb-2 text-foreground/60">客人</p>
             <CustomerPicker
+              key={customerId}
               customers={customers}
               name="customer_id"
               defaultCustomerId={customerId}

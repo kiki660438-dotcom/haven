@@ -340,6 +340,13 @@ export default async function DayPage({
                           messageLabel={remindMode ? "複製提醒訊息" : "複製預約成功訊息"}
                         />
                       )}
+                      {remindMode && a.status === "confirmed" && !customer?.line_user_id && (
+                        <LineReplyButton
+                          nickname={null}
+                          text={reminderMessage(customer?.name ?? "", a.start_time)}
+                          messageLabel="複製提醒訊息"
+                        />
+                      )}
                       {a.status === "confirmed" && customer?.phone && (
                         <a
                           href={smsLink(

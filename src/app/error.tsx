@@ -22,9 +22,14 @@ export default function Error({
       <p className="text-foreground/70 mb-2">
         請先按「重新整理」再試一次。如果一直出現，可能是登入過期，請按「重新登入」。
       </p>
-      {error.digest && (
-        <p className="text-xs text-foreground/40 mb-6">錯誤代碼：{error.digest}</p>
-      )}
+      {/* 把錯誤內容直接顯示出來，截圖就能看出是哪裡出錯（伺服器端的錯誤正式環境只會有代碼） */}
+      <div className="text-xs text-foreground/50 mb-6 p-3 rounded-lg bg-gray-50 break-all">
+        <p>網址：{typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}</p>
+        <p>
+          錯誤：{error.name} {error.message}
+        </p>
+        {error.digest && <p>錯誤代碼：{error.digest}</p>}
+      </div>
       <div className="flex gap-3">
         <button
           type="button"

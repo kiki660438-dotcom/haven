@@ -90,6 +90,8 @@ export default async function CheckoutPage({
         >
           <label className="block text-sm text-foreground/60">先選客人（會列出他的商品券；現場客可以略過）</label>
           <CustomerPicker
+            key={customerId}
+            autoSubmit
             customers={customersResult.data ?? []}
             name="customer_id"
             defaultCustomerId={customerId}
