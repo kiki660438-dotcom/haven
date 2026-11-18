@@ -17,6 +17,27 @@ function groupServices(services: ServiceOption[]) {
   return [...map.entries()].map(([title, items]) => ({ title, items }));
 }
 
+// 放在元件外面：寫在元件裡面的話，每點一次勾選整排選項都會被重建，
+// 在 iPad/手機上容易點了沒反應或跳回去
+function Item({
+  s,
+  label,
+  checked,
+  onToggle,
+}: {
+  s: ServiceOption;
+  label: string;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light touch-manipulation">
+      <input type="checkbox" checked={checked} onChange={() => onToggle(s.id)} />
+      {label}
+    </label>
+  );
+}
+
 const field = "border border-primary-light rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-primary";
 
 export default function AppointmentEditor({
@@ -62,13 +83,6 @@ export default function AppointmentEditor({
   const singles = groups.filter((g) => g.items.length === 1);
   const multis = groups.filter((g) => g.items.length > 1);
 
-  const Item = ({ s, label }: { s: ServiceOption; label: string }) => (
-    <label className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-primary-light">
-      <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
-      {label}
-    </label>
-  );
-
   return (
     <form action={formAction} className="mt-3 pt-3 border-t border-primary-light flex flex-col gap-3">
       {[...selected].map((id) => (
@@ -90,7 +104,13 @@ export default function AppointmentEditor({
         <p className="text-xs text-foreground/50 mb-1">服務項目（已選 {selected.size} 項）</p>
         <div className="flex flex-col gap-0.5 max-h-56 overflow-y-auto border border-primary-light rounded-lg p-1.5">
           {singles.map((g) => (
-            <Item key={g.items[0].id} s={g.items[0]} label={`${g.items[0].name}（$${g.items[0].price}）`} />
+            <Item
+              key={g.items[0].id}
+              s={g.items[0]}
+              label={`${g.items[0].name}（$${g.items[0].price}）`}
+              checked={selected.has(g.items[0].id)}
+              onToggle={toggle}
+            />
           ))}
           {multis.map((g) => (
             <details key={g.title} open={g.items.some((s) => selected.has(s.id))} className="group">
@@ -100,7 +120,13 @@ export default function AppointmentEditor({
               </summary>
               <div className="pl-3">
                 {g.items.map((s) => (
-                  <Item key={s.id} s={s} label={`${s.name.slice(g.title.length + 1)}（$${s.price}）`} />
+                  <Item
+                    key={s.id}
+                    s={s}
+                    label={`${s.name.slice(g.title.length + 1)}（$${s.price}）`}
+                    checked={selected.has(s.id)}
+                    onToggle={toggle}
+                  />
                 ))}
               </div>
             </details>
@@ -113,7 +139,7 @@ export default function AppointmentEditor({
               </summary>
               <div className="pl-3">
                 {packages.map((s) => (
-                  <Item key={s.id} s={s} label={s.name} />
+                  <Item key={s.id} s={s} label={s.name} checked={selected.has(s.id)} onToggle={toggle} />
                 ))}
               </div>
             </details>

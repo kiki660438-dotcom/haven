@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
-import UpdateTimeForm from "./UpdateTimeForm";
+import AppointmentEditor, { type ServiceOption } from "./calendar/AppointmentEditor";
 import { getLineDisplayName } from "@/lib/line";
 import LineReplyButton from "./LineReplyButton";
 import { confirmMessage, smsLink } from "@/lib/messages";
@@ -68,13 +68,16 @@ export default async function AppointmentsPage({
   const activeFilter = date ? "date" : filter ?? "upcoming";
 
   const supabase = await createClient();
-  const { data: appointments } = await supabase
-    .from("appointments")
-    .select(
-      "id, customer_id, start_time, created_at, status, buffer_minutes, party_size, note, customers(name, phone, line_user_id), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(services(name, price, total_sessions, buffer_minutes))"
-    )
-    .order("start_time", { ascending: true })
-    .order("created_at", { ascending: true });
+  const [{ data: appointments }, { data: serviceOptions }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select(
+        "id, customer_id, start_time, created_at, status, buffer_minutes, party_size, note, service_id, customers(name, phone, line_user_id), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(service_id, services(name, price, total_sessions, buffer_minutes))"
+      )
+      .order("start_time", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase.from("services").select("id, name, price, total_sessions").order("name"),
+  ]);
 
   const today = todayKey();
   const pendingCount = appointments?.filter((a) => a.status === "pending").length ?? 0;
@@ -195,6 +198,8 @@ export default async function AppointmentsPage({
                 // 商品券方案（有堂數）是用既有堂數預約，不收費，不要把方案全額算進預約金額
                 const totalPrice = services.reduce((sum, s) => sum + (s.total_sessions ? 0 : s.price ?? 0), 0);
                 const usesVoucher = services.some((s) => s.total_sessions);
+                const linkedIds = (a.appointment_services ?? []).map((row) => row.service_id);
+                const serviceIds = linkedIds.length > 0 ? linkedIds : a.service_id ? [a.service_id] : [];
                 const maxServiceBuffer = services.reduce(
                   (max, s) => Math.max(max, s.buffer_minutes ?? 0),
                   0
@@ -328,14 +333,17 @@ export default async function AppointmentsPage({
                     <details className="mt-2 group">
                       <summary className="text-xs text-foreground/50 cursor-pointer select-none inline-flex items-center gap-1 hover:text-primary-dark">
                         <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
-                        修改時間／緩衝
+                        修改預約（時間、服務項目、緩衝、備註）
                       </summary>
-                      <UpdateTimeForm
+                      <AppointmentEditor
+                        key={`${a.id}-${a.start_time}-${a.buffer_minutes}-${serviceIds.join(",")}-${a.note ?? ""}`}
                         appointmentId={a.id}
-                        defaultDate={toDateInputValue(a.start_time)}
-                        defaultTime={toTimeInputValue(a.start_time)}
-                        defaultBufferHours={Math.floor((a.buffer_minutes ?? maxServiceBuffer) / 60)}
-                        defaultBufferMinutes={(a.buffer_minutes ?? maxServiceBuffer) % 60}
+                        dateKey={toDateInputValue(a.start_time)}
+                        time={toTimeInputValue(a.start_time)}
+                        bufferMinutes={a.buffer_minutes ?? maxServiceBuffer}
+                        serviceIds={serviceIds}
+                        note={a.note}
+                        services={(serviceOptions ?? []) as ServiceOption[]}
                       />
                     </details>
                     )}
