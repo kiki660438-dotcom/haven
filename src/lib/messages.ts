@@ -47,7 +47,7 @@ export function reminderMessage(name: string, startIso: string) {
   const p = (t: string) => parts.find((x) => x.type === t)?.value ?? "";
   const when = `${p("month")}月${p("day")}日（${p("weekday").replace("週", "")}）${p("hour")}:${p("minute")}`;
   const dayWord = relativeDayWord(startIso);
-  return `親愛的 ${name} 客人您好 😊\n提醒您，${dayWord ? `${dayWord} ` : ""}${when} 在 Haven Hair 有預約。\n地址：${MAPS_URL}\n如需更改時間，請提前告訴我們，謝謝！`;
+  return `親愛的 ${name} 客人您好 😊\n提醒您，${dayWord ? `${dayWord} ` : ""}${when} 在 Haven Hair 有預約。\n地址：${MAPS_URL}`;
 }
 
 // 手機上點這個連結會直接打開簡訊，號碼和內容都已經填好（iPhone、Android 都適用）
