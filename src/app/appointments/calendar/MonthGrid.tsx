@@ -5,6 +5,8 @@ import Link from "next/link";
 import { X, ShoppingCart, Pencil, Trash2 } from "lucide-react";
 import { cancelAppointmentQuietly } from "../actions";
 import AppointmentEditor, { type ServiceOption } from "./AppointmentEditor";
+import LineReplyButton from "../LineReplyButton";
+import { reminderMessage } from "@/lib/messages";
 
 export type ApptInfo = {
   id: string;
@@ -216,6 +218,13 @@ export default function MonthGrid({ cells, services }: { cells: DayCell[]; servi
                       >
                         <ShoppingCart size={12} /> 開單
                       </Link>
+                      {a.status === "confirmed" && (
+                        <LineReplyButton
+                          nickname={null}
+                          text={reminderMessage(a.name, `${a.dateKey}T${a.time}:00+08:00`)}
+                          messageLabel="複製提醒訊息"
+                        />
+                      )}
                       {a.customerId && (
                         <Link href={`/members/${a.customerId}`} className="text-xs text-foreground/50 underline">
                           客人資料
