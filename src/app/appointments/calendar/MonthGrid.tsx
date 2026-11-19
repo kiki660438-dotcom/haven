@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { X, ShoppingCart, Pencil, Trash2 } from "lucide-react";
-import { cancelAppointmentQuietly } from "../actions";
+import { X, ShoppingCart, Pencil, Trash2, Check } from "lucide-react";
+import { cancelAppointmentQuietly, updateAppointmentStatus } from "../actions";
 import AppointmentEditor, { type ServiceOption } from "./AppointmentEditor";
 import LineReplyButton from "../LineReplyButton";
 import { reminderMessage } from "@/lib/messages";
@@ -205,6 +205,17 @@ export default function MonthGrid({ cells, services }: { cells: DayCell[]; servi
                     {a.note && <p className="text-xs text-foreground/50 mt-0.5">備註：{a.note}</p>}
 
                     <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                      {/* 待確認的預約直接在這裡確認：有綁 LINE 的客人會收到確認通知，確認後回到這個月的月曆 */}
+                      {a.status === "pending" && (
+                        <form action={updateAppointmentStatus.bind(null, a.id, "confirmed")}>
+                          <button
+                            type="submit"
+                            className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-primary-dark text-white hover:bg-primary touch-manipulation"
+                          >
+                            <Check size={12} /> 確認預約
+                          </button>
+                        </form>
+                      )}
                       <button
                         type="button"
                         onClick={() => setEditingId(editingId === a.id ? null : a.id)}
