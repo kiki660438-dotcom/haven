@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { updateAppointmentStatus, cancelAppointmentQuietly } from "./actions";
 import AppointmentEditor, { type ServiceOption } from "./calendar/AppointmentEditor";
 import { getLineDisplayName } from "@/lib/line";
@@ -73,14 +74,19 @@ export default async function AppointmentsPage({
   const activeFilter = date ? "date" : filter ?? "upcoming";
 
   const supabase = await createClient();
-  const [{ data: appointments }, { data: serviceOptions }] = await Promise.all([
-    supabase
-      .from("appointments")
-      .select(
-        "id, customer_id, start_time, created_at, status, buffer_minutes, party_size, note, service_id, customers(name, phone, line_user_id), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(service_id, services(name, price, total_sessions, buffer_minutes))"
-      )
-      .order("start_time", { ascending: true })
-      .order("created_at", { ascending: true }),
+  // 一頁一頁抓完全部預約：超過 1000 筆時，最新的預約才不會被截掉
+  const [appointments, { data: serviceOptions }] = await Promise.all([
+    fetchAllRows((from, to) =>
+      supabase
+        .from("appointments")
+        .select(
+          "id, customer_id, start_time, created_at, status, buffer_minutes, party_size, note, service_id, customers(name, phone, line_user_id), staff(name), services(name, price, total_sessions, buffer_minutes), appointment_services(service_id, services(name, price, total_sessions, buffer_minutes))"
+        )
+        .order("start_time", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id")
+        .range(from, to)
+    ),
     supabase.from("services").select("id, name, price, total_sessions").order("name"),
   ]);
 
@@ -92,9 +98,49 @@ export default async function AppointmentsPage({
     dateKey: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date(a.start_time)),
   }));
 
+  // 「未開單」：日期已經過了、還沒變成已完成（開單後會自動變已完成）的預約。
+  // 有些訂單是直接匯入資料庫、沒經過開單按鈕，所以同一位客人當天已經有付款訂單的就不算漏開
+  let billedKeys = new Set<string>();
+  if (activeFilter === "unbilled") {
+    const candidates = withKey.filter(
+      (a) => a.dateKey < today && (a.status === "confirmed" || a.status === "pending")
+    );
+    const earliest = candidates.reduce<string | null>(
+      (min, a) => (min === null || a.dateKey < min ? a.dateKey : min),
+      null
+    );
+    if (earliest) {
+      const orders = await fetchAllRows((from, to) =>
+        supabase
+          .from("orders")
+          .select("id, customer_id, created_at")
+          .eq("status", "paid")
+          .gte("created_at", `${earliest}T00:00:00+08:00`)
+          .order("created_at")
+          .order("id")
+          .range(from, to)
+      );
+      billedKeys = new Set(
+        orders
+          .filter((o) => o.customer_id)
+          .map(
+            (o) =>
+              `${o.customer_id}|${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date(o.created_at))}`
+          )
+      );
+    }
+  }
+
   const filtered = withKey.filter((a) => {
     // 已取消的預約只在「已取消」分頁看得到，其他畫面一律不顯示，避免版面雜亂
     if (activeFilter === "cancelled") return a.status === "cancelled";
+    if (activeFilter === "unbilled") {
+      return (
+        a.dateKey < today &&
+        (a.status === "confirmed" || a.status === "pending") &&
+        !billedKeys.has(`${a.customer_id}|${a.dateKey}`)
+      );
+    }
     if (a.status === "cancelled") return false;
     if (activeFilter === "date") return a.dateKey === date;
     if (activeFilter === "pending") return a.status === "pending";
@@ -127,6 +173,7 @@ export default async function AppointmentsPage({
     { key: "pending", label: pendingCount > 0 ? `待確認 (${pendingCount})` : "待確認" },
     { key: "today", label: "今天" },
     { key: "all", label: "全部" },
+    { key: "unbilled", label: "未開單" },
     { key: "cancelled", label: "已取消" },
   ];
 
@@ -188,6 +235,13 @@ export default async function AppointmentsPage({
           </span>
         )}
       </div>
+
+      {activeFilter === "unbilled" && (
+        <p className="text-xs text-foreground/60 mb-4 px-3 py-2 rounded-lg bg-primary-light/50">
+          列出日期已過、還沒開單的預約（客人當天已經有付款訂單的不列入）。補開單請按「開單」；
+          客人沒來就按「客人取消」。共 {filtered.length} 筆。
+        </p>
+      )}
 
       {sortedKeys.length === 0 && (
         <p className="text-center text-foreground/50 py-12">這個篩選條件下沒有預約</p>
