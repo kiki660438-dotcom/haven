@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { updateAppointmentStatus } from "../appointments/actions";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 function todayRangeTaipei() {
   const dateStr = new Intl.DateTimeFormat("en-CA", {
@@ -13,6 +15,13 @@ function todayRangeTaipei() {
   };
 }
 
+// "2026-10" 加減幾個月
+function shiftMonth(month: string, delta: number) {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 const statusLabel: Record<string, string> = {
   pending: "待確認",
   confirmed: "已確認",
@@ -20,9 +29,39 @@ const statusLabel: Record<string, string> = {
   completed: "已完成",
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
   const { start, end, dateStr } = todayRangeTaipei();
+  const currentMonth = dateStr.slice(0, 7);
+  const { month: monthParam } = await searchParams;
+  const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonth;
   const supabase = await createClient();
+
+  // 每月營業額：選定月份的所有已付款訂單（一頁一頁抓完，訂單多也不會漏）
+  const monthOrders = await fetchAllRows((from, to) =>
+    supabase
+      .from("orders")
+      .select("id, total, payment_method, created_at")
+      .eq("status", "paid")
+      .gte("created_at", `${month}-01T00:00:00+08:00`)
+      .lt("created_at", `${shiftMonth(month, 1)}-01T00:00:00+08:00`)
+      .order("created_at")
+      .order("id")
+      .range(from, to)
+  );
+  const monthRevenue = monthOrders.reduce((sum, o) => sum + o.total, 0);
+  const monthCash = monthOrders
+    .filter((o) => o.payment_method === "cash")
+    .reduce((sum, o) => sum + o.total, 0);
+  const monthTransfer = monthOrders
+    .filter((o) => o.payment_method === "transfer")
+    .reduce((sum, o) => sum + o.total, 0);
+  // 沒記付款方式的（例如舊資料、只扣商品券 $0 的單）
+  const monthOther = monthRevenue - monthCash - monthTransfer;
+  const [monthY, monthM] = month.split("-").map(Number);
 
   const [
     { data: todayAppointmentList },
@@ -85,6 +124,69 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
+
+      <section className="mb-8 p-5 rounded-xl border border-primary-light bg-white">
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+          <h2 className="font-semibold">每月營業額</h2>
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/dashboard?month=${shiftMonth(month, -1)}`}
+              aria-label="上個月"
+              className="p-2 rounded-lg hover:bg-primary-light text-primary-dark touch-manipulation"
+            >
+              <ChevronLeft size={18} />
+            </Link>
+            <form method="GET" action="/dashboard">
+              <input
+                type="month"
+                name="month"
+                defaultValue={month}
+                key={month}
+                className="border border-primary-light rounded-lg px-2 py-1.5 text-sm"
+              />
+              <button type="submit" className="ml-1 text-sm text-primary-dark underline">
+                查詢
+              </button>
+            </form>
+            <Link
+              href={`/dashboard?month=${shiftMonth(month, 1)}`}
+              aria-label="下個月"
+              className="p-2 rounded-lg hover:bg-primary-light text-primary-dark touch-manipulation"
+            >
+              <ChevronRight size={18} />
+            </Link>
+          </div>
+        </div>
+
+        <p className="text-sm text-foreground/60 mb-3">
+          {monthY} 年 {monthM} 月・共 {monthOrders.length} 筆已付款訂單
+          {month !== currentMonth && (
+            <Link href="/dashboard" className="ml-2 underline text-primary-dark">
+              回到本月
+            </Link>
+          )}
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-4 rounded-xl bg-primary-light/50">
+            <p className="text-sm text-foreground/60 mb-1">總營業額</p>
+            <p className="text-2xl font-bold text-primary-dark">${monthRevenue.toLocaleString()}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-primary-light/50">
+            <p className="text-sm text-foreground/60 mb-1">現金</p>
+            <p className="text-2xl font-bold text-primary-dark">${monthCash.toLocaleString()}</p>
+          </div>
+          <div className="p-4 rounded-xl bg-primary-light/50">
+            <p className="text-sm text-foreground/60 mb-1">匯款</p>
+            <p className="text-2xl font-bold text-primary-dark">${monthTransfer.toLocaleString()}</p>
+          </div>
+        </div>
+        {monthOther !== 0 && (
+          <p className="text-xs text-foreground/50 mt-3">
+            另有 ${monthOther.toLocaleString()} 沒有記錄付款方式（例如舊資料），已算在總營業額裡。
+          </p>
+        )}
+      </section>
 
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-semibold">今日預約名單</h2>
