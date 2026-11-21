@@ -55,6 +55,25 @@ order by 1, 2;
 
 
 -- ============ 第 2 步：合併（確認預覽沒問題才執行） ============
+-- 合併紀錄：每次合併都記下被刪的那筆客人原本的資料、留下那筆合併前的資料、搬了哪些預約／訂單／商品券／配方紀錄，
+-- 萬一合併錯了，可以用 undo_customer_merge.sql 照紀錄拆回兩筆
+create table if not exists customer_merge_log (
+  id uuid primary key default gen_random_uuid(),
+  merged_at timestamptz not null default now(),
+  kept_customer_id uuid not null,
+  removed_customer jsonb not null,
+  kept_before jsonb not null,
+  moved jsonb not null,
+  source text,
+  undone_at timestamptz
+);
+alter table customer_merge_log enable row level security;
+do $p$ begin
+  if not exists (select 1 from pg_policies where tablename = 'customer_merge_log' and policyname = 'staff_all_customer_merge_log') then
+    create policy "staff_all_customer_merge_log" on customer_merge_log for all to authenticated using (true) with check (true);
+  end if;
+end $p$;
+
 do $do$
 declare
   r record;
@@ -98,6 +117,18 @@ begin
       raise notice '略過：%（原本的客人已經綁了別的 LINE）', r.dup_id;
       continue;
     end if;
+
+    insert into customer_merge_log (kept_customer_id, removed_customer, kept_before, moved, source)
+    select r.keep_id,
+      (select to_jsonb(c) from customers c where c.id = r.dup_id),
+      (select to_jsonb(c) from customers c where c.id = r.keep_id),
+      jsonb_build_object(
+        'appointments', coalesce((select jsonb_agg(id) from appointments where customer_id = r.dup_id), '[]'::jsonb),
+        'orders', coalesce((select jsonb_agg(id) from orders where customer_id = r.dup_id), '[]'::jsonb),
+        'vouchers', coalesce((select jsonb_agg(id) from vouchers where customer_id = r.dup_id), '[]'::jsonb),
+        'customer_records', coalesce((select jsonb_agg(id) from customer_records where customer_id = r.dup_id), '[]'::jsonb)
+      ),
+      'merge_line_duplicates.sql';
 
     update appointments set customer_id = r.keep_id where customer_id = r.dup_id;
     update orders set customer_id = r.keep_id where customer_id = r.dup_id;
