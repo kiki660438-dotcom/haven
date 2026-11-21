@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 import { getLineProfile } from "@/lib/line";
 import RecordsPanel, { type RecordRow } from "./RecordsPanel";
+import MergeCustomerPanel from "./MergeCustomerPanel";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { Phone, MessageSquare, CalendarPlus, ShoppingCart, ChevronLeft, Pencil } from "lucide-react";
 
 const TABS = [
@@ -56,10 +58,10 @@ export default async function MemberDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; merged?: string }>;
 }) {
   const { id } = await params;
-  const { tab } = await searchParams;
+  const { tab, merged } = await searchParams;
   const activeTab = TABS.some((t) => t.key === tab) ? (tab as string) : "info";
 
   const supabase = await createClient();
@@ -110,6 +112,28 @@ export default async function MemberDetailPage({
   }
 
   const profile = customer.line_user_id ? await getLineProfile(customer.line_user_id) : null;
+
+  // 「合併重複的客人」用：全部客人名單＋可能是同一個人的建議（名字互相包含，而且其中一筆沒有電話，
+  // 例如 LINE 登入自動建立的「佳郁」和神美匯入的「曾佳郁」）
+  const allCustomers =
+    activeTab === "info"
+      ? await fetchAllRows((from, to) =>
+          supabase.from("customers").select("id, name, phone").order("name").order("id").range(from, to)
+        )
+      : [];
+  const myName = (customer.name ?? "").trim();
+  const mergeSuggestions =
+    myName.length >= 2
+      ? allCustomers
+          .filter((c) => {
+            if (c.id === customer.id) return false;
+            const other = (c.name ?? "").trim();
+            if (other.length < 2) return false;
+            const related = other.includes(myName) || myName.includes(other);
+            return related && (!customer.phone || !c.phone);
+          })
+          .slice(0, 5)
+      : [];
 
   const paid = (orders ?? []).filter((o) => o.status === "paid");
   const totalSpent = paid.reduce((s, o) => s + o.total, 0);
@@ -213,6 +237,10 @@ export default async function MemberDetailPage({
         ))}
       </div>
 
+      {merged && (
+        <div className="mb-4 p-3 rounded-xl bg-green-50 text-green-700 text-sm">已合併完成。</div>
+      )}
+
       {activeTab === "info" && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-4 p-4 border border-primary-light rounded-xl bg-white">
           <Field label="電話" value={customer.phone} />
@@ -227,6 +255,14 @@ export default async function MemberDetailPage({
             <Field label="備註" value={customer.note} />
           </div>
         </div>
+      )}
+      {activeTab === "info" && (
+        <MergeCustomerPanel
+          customerId={customer.id}
+          customerName={customer.name ?? ""}
+          customers={allCustomers}
+          suggestions={mergeSuggestions}
+        />
       )}
 
       {activeTab === "records" && <RecordsPanel customerId={id} today={todayTaipei} records={records} />}

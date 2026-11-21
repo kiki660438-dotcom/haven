@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/book", "/my"];
+const PUBLIC_PATHS = ["/login", "/book", "/my", "/line-link"];
 
 export async function middleware(request: NextRequest) {
   // 手機輸入網址常被自動大寫（例如 /Book），路由是區分大小寫的，會被當成沒開放的後台頁面丟去登入。

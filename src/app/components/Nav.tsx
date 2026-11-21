@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-const PUBLIC_PREFIXES = ["/book", "/my", "/login"];
+const PUBLIC_PREFIXES = ["/book", "/my", "/login", "/line-link"];
 
 const links: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "首頁", icon: Home },
@@ -56,7 +56,7 @@ export default function Nav() {
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (isPublic) {
-    const isBook = pathname === "/book" || pathname.startsWith("/book/");
+    const isBook = pathname === "/book" || pathname.startsWith("/book/") || pathname === "/line-link";
     const isMy = pathname === "/my" || pathname.startsWith("/my/");
     return (
       <header className="bg-white border-b border-primary-light">
