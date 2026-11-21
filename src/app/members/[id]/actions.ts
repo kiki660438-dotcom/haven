@@ -87,7 +87,27 @@ export async function mergeCustomers(
     return { ok: false, error: "兩位客人綁定的是不同的 LINE 帳號，看起來不是同一個人，沒有合併" };
   }
 
-  for (const table of ["appointments", "orders", "vouchers", "customer_records"] as const) {
+  const tables = ["appointments", "orders", "vouchers", "customer_records"] as const;
+
+  // 合併紀錄：記下被刪那筆的完整資料、留下那筆合併前的資料、搬了哪些東西，合併錯了可以用
+  // supabase/undo_customer_merge.sql 拆回來。還沒建立紀錄表（沒跑過 merge_line_duplicates.sql）時就略過
+  const { data: dropFull } = await supabase.from("customers").select("*").eq("id", drop.id).maybeSingle();
+  const { data: keepFull } = await supabase.from("customers").select("*").eq("id", keep.id).maybeSingle();
+  const moved: Record<string, string[]> = {};
+  for (const table of tables) {
+    const { data } = await supabase.from(table).select("id").eq("customer_id", drop.id);
+    moved[table] = (data ?? []).map((r) => r.id as string);
+  }
+  const { error: logError } = await supabase.from("customer_merge_log").insert({
+    kept_customer_id: keep.id,
+    removed_customer: dropFull,
+    kept_before: keepFull,
+    moved,
+    source: "member_page",
+  });
+  if (logError) console.warn("customer_merge_log insert skipped", logError.message);
+
+  for (const table of tables) {
     const { error } = await supabase.from(table).update({ customer_id: keep.id }).eq("customer_id", drop.id);
     if (error) return { ok: false, error: `搬移資料失敗（${table}）：${error.message}` };
   }
