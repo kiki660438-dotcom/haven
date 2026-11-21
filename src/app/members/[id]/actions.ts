@@ -138,3 +138,42 @@ export async function mergeCustomers(
   revalidatePath("/appointments/calendar");
   redirect(`/members/${keep.id}?merged=1`);
 }
+
+export type DeleteState = { ok: boolean; error?: string } | null;
+
+// 刪除客人：只允許刪「完全沒有訂單、預約、商品券、配方紀錄」的客人（例如建錯、空白的重複資料）。
+// 有資料的要用「合併重複的客人」，資料才不會跟著消失
+export async function deleteCustomerSafely(customerId: string): Promise<DeleteState> {
+  const supabase = await createClient();
+  const counts = await Promise.all(
+    (["orders", "appointments", "vouchers", "customer_records"] as const).map(async (table) => {
+      const { count, error } = await supabase
+        .from(table)
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", customerId);
+      return { table, count: error ? -1 : count ?? 0 };
+    })
+  );
+  if (counts.some((c) => c.count === -1)) return { ok: false, error: "檢查資料失敗，請重新整理再試" };
+
+  const label: Record<string, string> = {
+    orders: "訂單",
+    appointments: "預約",
+    vouchers: "商品券",
+    customer_records: "配方紀錄",
+  };
+  const has = counts.filter((c) => c.count > 0).map((c) => `${label[c.table]} ${c.count} 筆`);
+  if (has.length > 0) {
+    return {
+      ok: false,
+      error: `這位客人還有${has.join("、")}，不能直接刪除（資料會一起消失）。如果是重複的客人，請用上面的「合併重複的客人」。`,
+    };
+  }
+
+  const { error } = await supabase.from("customers").delete().eq("id", customerId);
+  if (error) return { ok: false, error: `刪除失敗：${error.message}` };
+
+  revalidatePath("/customers");
+  revalidatePath("/members");
+  redirect("/customers");
+}

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase-server";
 import { getLineProfile } from "@/lib/line";
 import RecordsPanel, { type RecordRow } from "./RecordsPanel";
 import MergeCustomerPanel from "./MergeCustomerPanel";
+import DeleteCustomerButton from "./DeleteCustomerButton";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { Phone, MessageSquare, CalendarPlus, ShoppingCart, ChevronLeft, Pencil } from "lucide-react";
 
@@ -264,6 +265,7 @@ export default async function MemberDetailPage({
           suggestions={mergeSuggestions}
         />
       )}
+      {activeTab === "info" && <DeleteCustomerButton customerId={customer.id} customerName={customer.name ?? ""} />}
 
       {activeTab === "records" && <RecordsPanel customerId={id} today={todayTaipei} records={records} />}
 
