@@ -179,13 +179,17 @@ export default function MonthGrid({ cells, services }: { cells: DayCell[]; servi
                     <div className="flex items-start justify-between gap-2">
                       <p>
                         <span className="font-bold text-primary-dark mr-2">{a.time}</span>
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(editingId === a.id ? null : a.id)}
-                          className="font-semibold underline decoration-dotted underline-offset-2 text-left"
-                        >
-                          {a.name}
-                        </button>
+                        {/* 點名字直接看客人資料（編輯預約請按下面的「編輯」） */}
+                        {a.customerId ? (
+                          <Link
+                            href={`/members/${a.customerId}`}
+                            className="font-semibold underline decoration-dotted underline-offset-2 hover:text-primary-dark"
+                          >
+                            {a.name}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold">{a.name}</span>
+                        )}
                         {a.partySize > 1 && (
                           <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
                             {a.partySize} 位
@@ -235,11 +239,6 @@ export default function MonthGrid({ cells, services }: { cells: DayCell[]; servi
                           text={reminderMessage(a.name, `${a.dateKey}T${a.time}:00+08:00`)}
                           messageLabel="複製提醒訊息"
                         />
-                      )}
-                      {a.customerId && (
-                        <Link href={`/members/${a.customerId}`} className="text-xs text-foreground/50 underline">
-                          客人資料
-                        </Link>
                       )}
                       <form action={cancelAppointmentQuietly.bind(null, a.id)} className="ml-auto">
                         <button
