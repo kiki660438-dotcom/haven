@@ -3,7 +3,10 @@ import { supabase } from "@/lib/supabase";
 import {
   CUSTOMER_COOKIE,
   CUSTOMER_COOKIE_MAX_AGE,
+  LINE_PENDING_COOKIE,
+  LINE_PENDING_MAX_AGE,
   signCustomerToken,
+  signLinePending,
 } from "@/lib/customer-identity";
 
 export async function GET(request: Request) {
@@ -61,25 +64,20 @@ export async function GET(request: Request) {
     p_line_user_id: userId,
   });
 
-  let customerId: string;
-  if (existingId) {
-    customerId = existingId;
-  } else {
-    const { error } = await supabase.from("customers").insert({
-      name: displayName,
-      line_user_id: userId,
-    });
-    if (error) {
-      return NextResponse.redirect(`${origin}${decodeURIComponent(returnTo)}?error=line_login`);
-    }
-    const { data: newId } = await supabase.rpc("find_customer_id_by_line_user_id", {
-      p_line_user_id: userId,
-    });
-    if (!newId) {
-      return NextResponse.redirect(`${origin}${decodeURIComponent(returnTo)}?error=line_login`);
-    }
-    customerId = newId;
+  // 這個 LINE 還沒連到任何客人：先不要直接建新客人（老客人會變成兩筆、看不到消費紀錄和商品券），
+  // 改成請客人輸入電話，連到原本的會員資料；沒有台灣手機的再選「略過」建立新資料
+  if (!existingId) {
+    const pending = NextResponse.redirect(`${origin}/line-link`);
+    pending.cookies.set(
+      LINE_PENDING_COOKIE,
+      signLinePending(userId, displayName, decodeURIComponent(returnTo)),
+      { httpOnly: true, secure: true, sameSite: "lax", maxAge: LINE_PENDING_MAX_AGE, path: "/" }
+    );
+    pending.cookies.delete("line_login_state");
+    pending.cookies.delete("line_login_return_to");
+    return pending;
   }
+  const customerId: string = existingId;
 
   const redirectUrl = new URL(`${origin}${decodeURIComponent(returnTo)}`);
 

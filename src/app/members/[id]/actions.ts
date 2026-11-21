@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export type RecordState = { ok: boolean; error?: string } | null;
 
@@ -54,4 +55,66 @@ export async function deleteCustomerRecord(id: string, customerId: string) {
   const supabase = await createClient();
   await supabase.from("customer_records").delete().eq("id", id);
   refresh(customerId);
+}
+
+export type MergeState = { ok: boolean; error?: string } | null;
+
+// 合併重複的客人（例如用 LINE 登入自動建立、沒有電話的那筆，跟神美匯入、有消費紀錄的那筆）。
+// 留下有電話的那一筆（兩筆都有或都沒有時，留下目前這頁的客人），把預約、訂單、商品券、配方紀錄、
+// LINE 綁定都移過去，再刪掉另一筆。
+export async function mergeCustomers(
+  currentId: string,
+  _prev: MergeState,
+  formData: FormData
+): Promise<MergeState> {
+  const otherId = String(formData.get("other_id") ?? "");
+  if (!otherId) return { ok: false, error: "請先選擇要合併的客人" };
+  if (otherId === currentId) return { ok: false, error: "不能跟自己合併" };
+
+  const supabase = await createClient();
+  const { data: rows, error: loadError } = await supabase
+    .from("customers")
+    .select("id, name, phone, line_user_id, birthday, gender, email, note")
+    .in("id", [currentId, otherId]);
+  if (loadError) return { ok: false, error: `讀取客人失敗：${loadError.message}` };
+  const current = rows?.find((r) => r.id === currentId);
+  const other = rows?.find((r) => r.id === otherId);
+  if (!current || !other) return { ok: false, error: "找不到其中一位客人，請重新整理再試" };
+
+  const keep = !current.phone && other.phone ? other : current;
+  const drop = keep.id === current.id ? other : current;
+  if (keep.line_user_id && drop.line_user_id && keep.line_user_id !== drop.line_user_id) {
+    return { ok: false, error: "兩位客人綁定的是不同的 LINE 帳號，看起來不是同一個人，沒有合併" };
+  }
+
+  for (const table of ["appointments", "orders", "vouchers", "customer_records"] as const) {
+    const { error } = await supabase.from(table).update({ customer_id: keep.id }).eq("customer_id", drop.id);
+    if (error) return { ok: false, error: `搬移資料失敗（${table}）：${error.message}` };
+  }
+
+  // 先清掉要刪的那筆的 LINE，再綁到留下的那筆，避免同一個 LINE 同時綁兩個人
+  if (drop.line_user_id) {
+    const { error } = await supabase.from("customers").update({ line_user_id: null }).eq("id", drop.id);
+    if (error) return { ok: false, error: `搬移 LINE 綁定失敗：${error.message}` };
+  }
+  const { error: updateError } = await supabase
+    .from("customers")
+    .update({
+      line_user_id: keep.line_user_id ?? drop.line_user_id,
+      birthday: keep.birthday ?? drop.birthday,
+      gender: keep.gender ?? drop.gender,
+      email: keep.email ?? drop.email,
+      note: [keep.note, drop.note].filter(Boolean).join("\n") || null,
+    })
+    .eq("id", keep.id);
+  if (updateError) return { ok: false, error: `更新客人資料失敗：${updateError.message}` };
+
+  const { error: deleteError } = await supabase.from("customers").delete().eq("id", drop.id);
+  if (deleteError) return { ok: false, error: `資料已搬好，但刪除重複的客人失敗：${deleteError.message}` };
+
+  revalidatePath("/customers");
+  revalidatePath("/members");
+  revalidatePath("/appointments");
+  revalidatePath("/appointments/calendar");
+  redirect(`/members/${keep.id}?merged=1`);
 }
