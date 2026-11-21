@@ -26,8 +26,17 @@ export async function updateCustomerDemographics(id: string, formData: FormData)
   revalidatePath("/members");
 }
 
+// 有訂單、預約、商品券或配方紀錄的客人不刪（配方紀錄會被一起刪掉、其他的會刪不掉），
+// 要整理重複客人請到會員頁用「合併重複的客人」
 export async function deleteCustomer(id: string) {
   const supabase = await createClient();
+  for (const table of ["orders", "appointments", "vouchers", "customer_records"] as const) {
+    const { count, error } = await supabase
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .eq("customer_id", id);
+    if (error || (count ?? 0) > 0) return;
+  }
   await supabase.from("customers").delete().eq("id", id);
   revalidatePath("/customers");
 }
